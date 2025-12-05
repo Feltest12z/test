@@ -1,116 +1,278 @@
 -- ══════════════════════════════════════════════
---    Felixz UI Library v2.0 - WindUI Killer (Full Version)
---    Made with love for you bro - Completed by Grok
---    Usage: loadstring(game:HttpGet("https://raw.githubusercontent.com/Feltest12z/test/main/hub"))()
+-- FelixzUI 2.0 - Core Library (Updated Design)
 -- ══════════════════════════════════════════════
 
-local FelixzUI = {}
-FelixzUI.Version = "2.0"
-FelixzUI.Author = "Felixz (Completed by Grok)"
-
+-- Core Roblox Services
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local HttpService = game:GetService("HttpService")
 local CoreGui = game:GetService("CoreGui")
-local player = Players.LocalPlayer
+local GuiService = game:GetService("GuiService")
 
--- Themes (قابلة للتخصيص)
-FelixzUI.Themes = {
+local player = Players.LocalPlayer
+local Stats = game:GetService("Stats")
+
+-- جدول نخزن فيه كل دوال التوغلات (من الكود الجديد)
+getgenv().ToggleSetters = getgenv().ToggleSetters or {}
+getgenv().AllToggles = getgenv().AllToggles or {}
+getgenv().FelixzLoops = getgenv().FelixzLoops or {}
+getgenv().FelixzConnections = getgenv().FelixzConnections or {}
+
+
+-- دالة لتحديث أي توغل (لما نحمل config)
+getgenv().UpdateToggle = function(name, value)
+    local fn = getgenv().ToggleSetters[name]
+    if fn then
+        fn(value, true) -- true = لا تشغّل الحدث (لأننا نحمّل)
+    end
+end
+
+-- 🗂️ إعداد مجلد الحفظ
+local saveFolder = "workspace/FelixzHub/Configs"
+if not isfolder("workspace/FelixzHub") then
+    makefolder("workspace/FelixzHub")
+end
+if not isfolder(saveFolder) then
+    makefolder(saveFolder)
+end
+
+-- --------------------------------------------------
+-- 🎨 Themes (تم تحديث الثيمات لتبني الثيم الجديد)
+-- --------------------------------------------------
+
+-- ثيم افتراضي من الـ Settings
+getgenv().Themes = {
     Dark = {
-        Background = Color3.fromRGB(14, 14, 20),
-        Accent = Color3.fromRGB(22, 22, 32),
-        Text = Color3.fromRGB(240, 240, 255),
-        Primary = Color3.fromRGB(130, 90, 255),
-        Secondary = Color3.fromRGB(90, 200, 255),
-        Success = Color3.fromRGB(80, 220, 140),
-        Danger = Color3.fromRGB(255, 80, 100),
-        Shadow = Color3.fromRGB(0, 0, 0)
+        Background = Color3.fromRGB(16, 18, 29),
+        Accent     = Color3.fromRGB(30, 33, 50),
+        Text       = Color3.fromRGB(240, 240, 255),
+        Highlight  = Color3.fromRGB(105, 90, 205), -- Primary
+        Hover      = Color3.fromRGB(125, 110, 225),
+        Border     = Color3.fromRGB(55, 60, 85),
+        Shadow     = Color3.fromRGB(5, 7, 15),
+        Glow       = Color3.fromRGB(145, 130, 255),
+        Success    = Color3.fromRGB(80, 220, 140),
+        Danger     = Color3.fromRGB(255, 80, 100),
     },
+    -- الثيم الأزرق الأصلي كمرجع
     Blue = {
         Background = Color3.fromRGB(10, 15, 25),
         Accent = Color3.fromRGB(20, 30, 50),
         Text = Color3.fromRGB(200, 220, 255),
-        Primary = Color3.fromRGB(70, 130, 255),
-        Secondary = Color3.fromRGB(100, 150, 255),
+        Highlight = Color3.fromRGB(70, 130, 255),
+        Hover = Color3.fromRGB(100, 150, 255),
+        Border = Color3.fromRGB(50, 70, 100),
+        Shadow = Color3.fromRGB(0, 5, 15),
+        Glow = Color3.fromRGB(100, 150, 255),
         Success = Color3.fromRGB(100, 200, 150),
         Danger = Color3.fromRGB(255, 100, 120),
-        Shadow = Color3.fromRGB(0, 5, 15)
     },
-    -- أضف ثيمات أخرى هنا إذا تبي
 }
+getgenv().CurrentTheme = getgenv().Themes.Dark
+getgenv().ThemeUpdatables = getgenv().ThemeUpdatables or {}
+getgenv().ExtraThemeFunctions = getgenv().ExtraThemeFunctions or {}
 
-FelixzUI.CurrentTheme = FelixzUI.Themes.Dark
+-- --------------------------------------------------
+-- 🪟 GUI Setup (بنية الواجهة الجديدة)
+-- --------------------------------------------------
 
--- Notification System (دعم Icons)
-local NotifGui = Instance.new("ScreenGui")
-NotifGui.Name = "FelixzNotifications"
-NotifGui.Parent = CoreGui
-NotifGui.ResetOnSpawn = false
-local NotifHolder = Instance.new("Frame", NotifGui)
-NotifHolder.Size = UDim2.new(0, 300, 1, 0)
-NotifHolder.Position = UDim2.new(1, -320, 0, 20)
-NotifHolder.BackgroundTransparency = 1
-local NotifList = Instance.new("UIListLayout", NotifHolder)
-NotifList.Padding = UDim.new(0, 10)
-NotifList.VerticalAlignment = Enum.VerticalAlignment.Top
+local FelixzUI = {}
+FelixzUI.Version = "2.1"
+FelixzUI.Author = "Felixz (Completed by Grok)"
+local GUI_NAME = "FelixzHub"
+local playerGui = player:FindFirstChildOfClass("PlayerGui") or player:WaitForChild("PlayerGui")
+local gui, window, container, titleBar -- متغيرات لتخزين عناصر الواجهة الرئيسية
 
-function FelixzUI:Notify(Title, Text, Duration, Icon)
+-- ====== 🧹 حذف أي نسخ قديمة من الواجهة ======
+local function removeOldGUIs()
+    local oldInCore = game.CoreGui:FindFirstChild(GUI_NAME)
+    if oldInCore then oldInCore:Destroy() end
+    local oldInPlayer = playerGui:FindFirstChild(GUI_NAME)
+    if oldInPlayer then oldInPlayer:Destroy() end
+    for _, gui in ipairs(game.CoreGui:GetChildren()) do
+        if gui.Name == "FelixzHubNotifications" then gui:Destroy() end
+    end
+    for _, gui in ipairs(playerGui:GetChildren()) do
+        if gui.Name == "FelixzHubNotifications" then gui:Destroy() end
+    end
+end
+pcall(removeOldGUIs)
+
+-- 🔄 انتظار بسيط للتأكد أن النسخ القديمة حُذفت تماماً
+repeat
+    task.wait(0.1)
+until not game.CoreGui:FindFirstChild(GUI_NAME)
+    and not playerGui:FindFirstChild(GUI_NAME)
+
+task.wait(0.5)
+
+-- ==========================================
+-- 🪟 إنشاء GUI جديد (الـ ScreenGui)
+-- ==========================================
+gui = Instance.new("ScreenGui")
+gui.Name = GUI_NAME
+gui.ResetOnSpawn = false
+gui.IgnoreGuiInset = true
+gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+gui.DisplayOrder = 9999
+
+local uiScale = Instance.new("UIScale", gui)
+uiScale.Name = "UIScale"
+
+local ok, err = pcall(function()
+    gui.Parent = CoreGui
+end)
+if not ok then
+    warn("⚠️ لم يمكن وضع FelixzHub في CoreGui: " .. tostring(err))
+    gui.Parent = playerGui
+end
+
+-- 📱 تحديد نوع الجهاز + تطبيق المقياس
+local function getDeviceType(returnEmoji)
+    if GuiService:IsTenFootInterface() then
+        return "Console", "🎮"
+    elseif UserInputService.TouchEnabled then
+        local cam = workspace.CurrentCamera
+        local screenSize = cam and cam.ViewportSize or Vector2.new(1920, 1080)
+        if screenSize.X >= 1000 or screenSize.Y >= 700 then
+            return "Tablet", "📲"
+        else
+            return "Mobile", "📱"
+        end
+    else
+        return "PC", "💻"
+    end
+end
+
+local function applyScaleByDevice()
+    local device = getDeviceType()
+    local scaleByDevice = {
+        PC = 0.95,
+        Tablet = 0.85,
+        Mobile = 0.7,
+        Console = 1.0
+    }
+    uiScale.Scale = scaleByDevice[device] or 0.9
+end
+
+applyScaleByDevice()
+workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(applyScaleByDevice)
+
+-- --------------------------------------------------
+-- 📨 Notification System (تم تحديثه ليتطابق مع الكود الجديد)
+-- --------------------------------------------------
+
+local notifGui = Instance.new("ScreenGui")
+notifGui.Name = "FelixzHubNotifications"
+notifGui.ResetOnSpawn = false
+notifGui.IgnoreGuiInset = true
+notifGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+local ok, err = pcall(function()
+	notifGui.Parent = CoreGui
+end)
+if not ok then
+	notifGui.Parent = playerGui
+end
+
+local notifHolder = Instance.new("Frame")
+notifHolder.Name = "NotificationHolder"
+notifHolder.Size = UDim2.new(0, 320, 1, -20)
+notifHolder.Position = UDim2.new(1, -340, 0, 20)
+notifHolder.BackgroundTransparency = 1
+notifHolder.BorderSizePixel = 0
+notifHolder.ZIndex = 1000
+notifHolder.Parent = notifGui
+
+local list = Instance.new("UIListLayout")
+list.SortOrder = Enum.SortOrder.LayoutOrder
+list.Padding = UDim.new(0, 8)
+list.VerticalAlignment = Enum.VerticalAlignment.Top
+list.Parent = notifHolder
+
+getgenv().notifGui = notifGui
+getgenv().notifHolder = notifHolder
+
+function FelixzUI:Notify(Title, Text, Duration, Icon, ColorType)
+    local theme = getgenv().CurrentTheme
+    local iconImage = Icon or "rbxassetid://4483345998" -- Default gear
+    local iconColor = theme.Highlight
+    local bgTransparency = 0
     Duration = Duration or 3
-    Icon = Icon or "rbxassetid://4483345998"  -- Default icon (gear)
+
+    -- If using ColorType for quick status
+    if ColorType == "Success" then iconColor = theme.Success
+    elseif ColorType == "Danger" then iconColor = theme.Danger
+    elseif ColorType == "Primary" then iconColor = theme.Highlight end
+
     local Frame = Instance.new("Frame")
-    Frame.Size = UDim2.new(1, 0, 0, 80)
-    Frame.BackgroundColor3 = FelixzUI.CurrentTheme.Accent
+    Frame.Size = UDim2.new(0, 290, 0, 65)
+    Frame.BackgroundColor3 = theme.Accent
     Frame.BackgroundTransparency = 1
     Frame.BorderSizePixel = 0
-    Instance.new("UICorner", Frame).CornerRadius = UDim.new(0, 12)
-    Frame.Parent = NotifHolder
+    Frame.LayoutOrder = tick()
+    Frame.ZIndex = 100
+    Instance.new("UICorner", Frame).CornerRadius = UDim.new(0, 10)
+    Frame.Parent = notifHolder
 
     local IconLabel = Instance.new("ImageLabel", Frame)
-    IconLabel.Size = UDim2.new(0, 40, 0, 40)
-    IconLabel.Position = UDim2.new(0, 10, 0.5, -20)
+    IconLabel.Size = UDim2.new(0, 45, 0, 45)
+    IconLabel.Position = UDim2.new(0, 10, 0.5, -22)
     IconLabel.BackgroundTransparency = 1
-    IconLabel.Image = Icon
-    IconLabel.ImageColor3 = FelixzUI.CurrentTheme.Primary
+    IconLabel.Image = iconImage
+    IconLabel.ImageColor3 = iconColor
+    IconLabel.ImageTransparency = 1
+    Instance.new("UICorner", IconLabel).CornerRadius = UDim.new(0, 8)
 
     local TitleLabel = Instance.new("TextLabel", Frame)
     TitleLabel.Text = Title
     TitleLabel.Font = Enum.Font.GothamBold
-    TitleLabel.TextSize = 16
-    TitleLabel.TextColor3 = FelixzUI.CurrentTheme.Text
+    TitleLabel.TextSize = 15
+    TitleLabel.TextColor3 = theme.Text
     TitleLabel.BackgroundTransparency = 1
-    TitleLabel.Position = UDim2.new(0, 60, 0, 10)
-    TitleLabel.Size = UDim2.new(1, -80, 0, 20)
+    TitleLabel.Position = UDim2.new(0, 65, 0, 8)
+    TitleLabel.Size = UDim2.new(1, -70, 0, 20)
+    TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    TitleLabel.TextTransparency = 1
 
     local TextLabel = Instance.new("TextLabel", Frame)
     TextLabel.Text = Text
     TextLabel.Font = Enum.Font.Gotham
-    TextLabel.TextSize = 14
-    TextLabel.TextColor3 = FelixzUI.CurrentTheme.Text
+    TextLabel.TextSize = 13
+    TextLabel.TextColor3 = theme.Highlight
     TextLabel.BackgroundTransparency = 1
-    TextLabel.Position = UDim2.new(0, 60, 0, 35)
-    TextLabel.Size = UDim2.new(1, -80, 0, 35)
+    TextLabel.Position = UDim2.new(0, 65, 0, 32)
+    TextLabel.Size = UDim2.new(1, -70, 0, 25)
     TextLabel.TextWrapped = true
+    TextLabel.TextXAlignment = Enum.TextXAlignment.Left
+    TextLabel.TextTransparency = 1
 
-    -- Animate In
-    TweenService:Create(Frame, TweenInfo.new(0.3, Enum.EasingStyle.Back), {BackgroundTransparency = 0}):Play()
+    -- ✨ دخول ناعم
+    TweenService:Create(Frame, TweenInfo.new(0.3), {BackgroundTransparency = bgTransparency}):Play()
     TweenService:Create(IconLabel, TweenInfo.new(0.3), {ImageTransparency = 0}):Play()
     TweenService:Create(TitleLabel, TweenInfo.new(0.3), {TextTransparency = 0}):Play()
     TweenService:Create(TextLabel, TweenInfo.new(0.3), {TextTransparency = 0}):Play()
 
-    -- Animate Out
+    -- ⏳ خروج بعد انتهاء المدة
     task.delay(Duration, function()
-        TweenService:Create(Frame, TweenInfo.new(0.3), {BackgroundTransparency = 1}):Play()
-        TweenService:Create(IconLabel, TweenInfo.new(0.3), {ImageTransparency = 1}):Play()
-        TweenService:Create(TitleLabel, TweenInfo.new(0.3), {TextTransparency = 1}):Play()
-        TweenService:Create(TextLabel, TweenInfo.new(0.3), {TextTransparency = 1}):Play()
-        task.wait(0.3)
-        Frame:Destroy()
+        if Frame and Frame.Parent then
+            TweenService:Create(Frame, TweenInfo.new(0.3), {BackgroundTransparency = 1}):Play()
+            TweenService:Create(IconLabel, TweenInfo.new(0.3), {ImageTransparency = 1}):Play()
+            TweenService:Create(TitleLabel, TweenInfo.new(0.3), {TextTransparency = 1}):Play()
+            TweenService:Create(TextLabel, TweenInfo.new(0.3), {TextTransparency = 1}):Play()
+            task.wait(0.35)
+            Frame:Destroy()
+        end
     end)
 end
+getgenv().showNotification = FelixzUI.Notify -- ربط الدالة بالاسم الجديد لاستخدامه داخلياً في الكود المُرسل
 
--- Main Functions
+-- --------------------------------------------------
+-- 🧠 Main Functions
+-- --------------------------------------------------
+
 function FelixzUI:CreateWindow(Config)
     Config = Config or {}
     Config.Name = Config.Name or "Felixz Hub"
@@ -121,8 +283,10 @@ function FelixzUI:CreateWindow(Config)
     Window.Tabs = {}
     Window.KeyVerified = not Config.KeySystem
 
-    -- Key System (Optional)
+    -- ⚠️ هنا سيتم وضع Key System القديم إذا كان مفعلاً
     if Config.KeySystem and not isfile("felixz_key.txt") then
+        -- (هنا نضع الكود القديم لنظام المفتاح من مكتبتك الأصلية)
+        -- نُفترض أنك لا تريد تغيير تصميم نظام المفتاح الآن، لذا نستخدمه كما هو مع تحديث الألوان للثيم الجديد
         local KeyGui = Instance.new("ScreenGui")
         KeyGui.Name = "FelixzKeySystem"
         KeyGui.Parent = CoreGui
@@ -130,7 +294,7 @@ function FelixzUI:CreateWindow(Config)
         local Frame = Instance.new("Frame", KeyGui)
         Frame.Size = UDim2.new(0, 420, 0, 240)
         Frame.Position = UDim2.new(0.5, -210, 0.5, -120)
-        Frame.BackgroundColor3 = Color3.fromRGB(18, 18, 28)
+        Frame.BackgroundColor3 = getgenv().CurrentTheme.Accent
         Frame.BorderSizePixel = 0
         Instance.new("UICorner", Frame).CornerRadius = UDim.new(0, 16)
 
@@ -140,15 +304,15 @@ function FelixzUI:CreateWindow(Config)
         Glow.AnchorPoint = Vector2.new(0.5, 0.5)
         Glow.BackgroundTransparency = 1
         Glow.Image = "rbxassetid://4996891970"
-        Glow.ImageColor3 = FelixzUI.CurrentTheme.Primary
+        Glow.ImageColor3 = getgenv().CurrentTheme.Glow
         Glow.ImageTransparency = 0.6
         Glow.ZIndex = 0
 
         local Title = Instance.new("TextLabel", Frame)
-        Title.Text = "Felixz Hub – Key System"
+        Title.Text = Config.Name .. " – Key System"
         Title.Font = Enum.Font.GothamBold
         Title.TextSize = 24
-        Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+        Title.TextColor3 = getgenv().CurrentTheme.Text
         Title.BackgroundTransparency = 1
         Title.Size = UDim2.new(1, 0, 0, 50)
         Title.Position = UDim2.new(0, 0, 0, 20)
@@ -157,8 +321,8 @@ function FelixzUI:CreateWindow(Config)
         Input.PlaceholderText = "Enter your key..."
         Input.Size = UDim2.new(0, 360, 0, 50)
         Input.Position = UDim2.new(0.5, -180, 0.5, -25)
-        Input.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
-        Input.TextColor3 = Color3.fromRGB(255, 255, 255)
+        Input.BackgroundColor3 = getgenv().CurrentTheme.Border
+        Input.TextColor3 = getgenv().CurrentTheme.Text
         Input.Font = Enum.Font.Gotham
         Input.TextSize = 18
         Instance.new("UICorner", Input).CornerRadius = UDim.new(0, 12)
@@ -167,17 +331,17 @@ function FelixzUI:CreateWindow(Config)
         Submit.Text = "Verify"
         Submit.Size = UDim2.new(0, 360, 0, 50)
         Submit.Position = UDim2.new(0.5, -180, 1, -80)
-        Submit.BackgroundColor3 = FelixzUI.CurrentTheme.Primary
-        Submit.TextColor3 = Color3.fromRGB(255, 255, 255)
+        Submit.BackgroundColor3 = getgenv().CurrentTheme.Highlight
+        Submit.TextColor3 = Color3.new(1,1,1)
         Submit.Font = Enum.Font.GothamBold
         Submit.TextSize = 18
         Instance.new("UICorner", Submit).CornerRadius = UDim.new(0, 12)
 
         Submit.MouseEnter:Connect(function()
-            TweenService:Create(Submit, TweenInfo.new(0.2), {BackgroundColor3 = FelixzUI.CurrentTheme.Primary:lerp(Color3.new(1,1,1), 0.2)}):Play()
+            TweenService:Create(Submit, TweenInfo.new(0.2), {BackgroundColor3 = getgenv().CurrentTheme.Hover}):Play()
         end)
         Submit.MouseLeave:Connect(function()
-            TweenService:Create(Submit, TweenInfo.new(0.2), {BackgroundColor3 = FelixzUI.CurrentTheme.Primary}):Play()
+            TweenService:Create(Submit, TweenInfo.new(0.2), {BackgroundColor3 = getgenv().CurrentTheme.Highlight}):Play()
         end)
 
         Submit.MouseButton1Click:Connect(function()
@@ -185,10 +349,10 @@ function FelixzUI:CreateWindow(Config)
                 writefile("felixz_key.txt", "verified")
                 KeyGui:Destroy()
                 Window.KeyVerified = true
-                FelixzUI:Notify("Success", "Key accepted! Welcome to Felixz Hub! 🌟", 4, "rbxassetid://6031075938")  -- Success icon
+                FelixzUI:Notify("Success", "Key accepted! Welcome to Felixz Hub! 🌟", 4, "rbxassetid://6031075938", "Success")
                 Window:Init()
             else
-                FelixzUI:Notify("Error", "Invalid key! Try again.", 4, "rbxassetid://6035048640")  -- Error icon
+                FelixzUI:Notify("Error", "Invalid key! Try again.", 4, "rbxassetid://6035048640", "Danger")
                 Input.Text = ""
             end
         end)
@@ -207,133 +371,597 @@ function FelixzUI:CreateWindow(Config)
 
     -- Create Main Window
     function Window:Init()
-        local ScreenGui = Instance.new("ScreenGui")
-        ScreenGui.Name = "FelixzUI_" .. tick()  -- Unique name
-        ScreenGui.ResetOnSpawn = false
-        ScreenGui.IgnoreGuiInset = true
-        ScreenGui.Parent = CoreGui
+        -- 🌟 Fancy Loading Screen
+        local loadingFrame = Instance.new("Frame")
+        loadingFrame.Name = "LoadingFrame"
+        loadingFrame.Size = UDim2.new(0, 420, 0, 140)
+        loadingFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+        loadingFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+        loadingFrame.BackgroundColor3 = getgenv().CurrentTheme.Background
+        loadingFrame.BackgroundTransparency = 1
+        loadingFrame.BorderSizePixel = 0
+        loadingFrame.ClipsDescendants = true
+        loadingFrame.Parent = gui
+        Instance.new("UICorner", loadingFrame).CornerRadius = UDim.new(0, 16)
 
-        local Main = Instance.new("Frame")
-        Main.Name = "MainWindow"
-        Main.Size = UDim2.new(0, 680, 0, 480)
-        Main.Position = UDim2.new(0.5, -340, 0.5, -240)
-        Main.AnchorPoint = Vector2.new(0.5, 0.5)
-        Main.BackgroundColor3 = FelixzUI.CurrentTheme.Background
-        Main.BackgroundTransparency = 0.05
-        Main.BorderSizePixel = 0
-        Main.ClipsDescendants = true
-        local MainCorner = Instance.new("UICorner", Main)
-        MainCorner.CornerRadius = UDim.new(0, 16)
-        Main.Parent = ScreenGui
+        local shadow = Instance.new("ImageLabel", loadingFrame)
+        shadow.AnchorPoint = Vector2.new(0.5, 0.5)
+        shadow.Position = loadingFrame.Position
+        shadow.Size = UDim2.new(1, 40, 1, 40)
+        shadow.BackgroundTransparency = 1
+        shadow.Image = "rbxassetid://1316045217"
+        shadow.ImageColor3 = getgenv().CurrentTheme.Shadow
+        shadow.ImageTransparency = 1
+        shadow.ScaleType = Enum.ScaleType.Slice
+        shadow.SliceCenter = Rect.new(10, 10, 118, 118)
+        shadow.ZIndex = loadingFrame.ZIndex - 1
+        shadow.Parent = loadingFrame
 
-        -- Glow Effect
-        local Glow = Instance.new("ImageLabel", Main)
-        Glow.Name = "Glow"
-        Glow.Size = UDim2.new(1, 80, 1, 80)
-        Glow.Position = UDim2.new(0.5, -40, 0.5, -40)
-        Glow.AnchorPoint = Vector2.new(0.5, 0.5)
-        Glow.BackgroundTransparency = 1
-        Glow.Image = "rbxassetid://4996891970"
-        Glow.ImageColor3 = FelixzUI.CurrentTheme.Primary
-        Glow.ImageTransparency = 0.5
-        Glow.ZIndex = -1
+        local bgGrad = Instance.new("UIGradient", loadingFrame)
+        bgGrad.Color = ColorSequence.new {
+            ColorSequenceKeypoint.new(0, getgenv().CurrentTheme.Highlight),
+            ColorSequenceKeypoint.new(1, getgenv().CurrentTheme.Background)
+        }
+        bgGrad.Rotation = 45
 
-        local Stroke = Instance.new("UIStroke", Main)
-        Stroke.Thickness = 2
-        Stroke.Color = FelixzUI.CurrentTheme.Primary
-        Stroke.Transparency = 0.3
+        local label = Instance.new("TextLabel", loadingFrame)
+        label.Size = UDim2.new(1, -40, 0, 30)
+        label.Position = UDim2.new(0.5, 0, 0.25, 0)
+        label.AnchorPoint = Vector2.new(0.5, 0)
+        label.BackgroundTransparency = 1
+        label.Text = "جار التحميل... 0%"
+        label.TextColor3 = getgenv().CurrentTheme.Text
+        label.Font = Enum.Font.GothamBold
+        label.TextScaled = true
+        label.ZIndex = 2
 
-        -- Title Bar
-        local TitleBar = Instance.new("Frame", Main)
-        TitleBar.Name = "TitleBar"
-        TitleBar.Size = UDim2.new(1, 0, 0, 50)
-        TitleBar.BackgroundColor3 = FelixzUI.CurrentTheme.Accent
-        TitleBar.BorderSizePixel = 0
-        local TitleCorner = Instance.new("UICorner", TitleBar)
-        TitleCorner.CornerRadius = UDim.new(0, 16, 0, 0)  -- Top corners only
-        TitleBar.Parent = Main
+        local glowText = Instance.new("UIStroke", label)
+        glowText.Color = getgenv().CurrentTheme.Glow
+        glowText.Thickness = 1.2
+        glowText.Transparency = 0.5
 
-        local Title = Instance.new("TextLabel", TitleBar)
-        Title.Text = Config.Name
-        Title.Font = Enum.Font.GothamBold
-        Title.TextSize = 18
-        Title.TextColor3 = FelixzUI.CurrentTheme.Text
-        Title.BackgroundTransparency = 1
-        Title.Size = UDim2.new(1, -100, 1, 0)
-        Title.Position = UDim2.new(0, 20, 0, 0)
-        Title.TextXAlignment = Enum.TextXAlignment.Left
+        local barBg = Instance.new("Frame", loadingFrame)
+        barBg.Size = UDim2.new(1, -40, 0, 20)
+        barBg.Position = UDim2.new(0.5, 0, 0.65, 0)
+        barBg.AnchorPoint = Vector2.new(0.5, 0)
+        barBg.BackgroundColor3 = getgenv().CurrentTheme.Accent
+        barBg.BorderSizePixel = 0
+        Instance.new("UICorner", barBg).CornerRadius = UDim.new(0, 10)
 
-        -- Minimize & Close Buttons
-        local MinBtn = Instance.new("TextButton", TitleBar)
-        MinBtn.Text = "−"
-        MinBtn.Size = UDim2.new(0, 30, 0, 30)
-        MinBtn.Position = UDim2.new(1, -60, 0.5, -15)
-        MinBtn.BackgroundColor3 = FelixzUI.CurrentTheme.Danger
-        MinBtn.TextColor3 = Color3.new(1,1,1)
-        MinBtn.Font = Enum.Font.GothamBold
-        MinBtn.TextSize = 20
-        Instance.new("UICorner", MinBtn).CornerRadius = UDim.new(0, 6)
-        MinBtn.MouseButton1Click:Connect(function()
-            Main.Visible = not Main.Visible
-            MinBtn.Text = Main.Visible and "−" or "+"
+        local bar = Instance.new("Frame", barBg)
+        bar.Size = UDim2.new(0, 0, 1, 0)
+        bar.BackgroundColor3 = getgenv().CurrentTheme.Highlight
+        bar.BackgroundTransparency = 0.1
+        Instance.new("UICorner", bar).CornerRadius = UDim.new(0, 10)
+
+        local barStroke = Instance.new("UIStroke", bar)
+        barStroke.Color = getgenv().CurrentTheme.Text
+        barStroke.Transparency = 0.85
+        barStroke.Thickness = 1
+
+        local shimmer = Instance.new("UIGradient", bar)
+        shimmer.Color = ColorSequence.new {
+            ColorSequenceKeypoint.new(0, getgenv().CurrentTheme.Highlight),
+            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 255, 255)),
+            ColorSequenceKeypoint.new(1, getgenv().CurrentTheme.Highlight)
+        }
+        shimmer.Rotation = 0
+        getgenv().FelixzLoops["ShimmerAnim"] = task.spawn(function()
+            while shimmer.Parent do
+                for i = -1, 1, 0.05 do
+                    shimmer.Offset = Vector2.new(i, 0)
+                    task.wait(0.05)
+                end
+            end
         end)
 
-        local CloseBtn = Instance.new("TextButton", TitleBar)
-        CloseBtn.Text = "×"
-        CloseBtn.Size = UDim2.new(0, 30, 0, 30)
-        CloseBtn.Position = UDim2.new(1, -25, 0.5, -15)
-        CloseBtn.BackgroundColor3 = FelixzUI.CurrentTheme.Danger
-        CloseBtn.TextColor3 = Color3.new(1,1,1)
-        CloseBtn.Font = Enum.Font.GothamBold
-        CloseBtn.TextSize = 20
-        Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 6)
-        CloseBtn.MouseButton1Click:Connect(function()
-            ScreenGui:Destroy()
-            FelixzUI:Notify("Goodbye", "Felixz Hub closed.", 2)
+        -- ✨ دخول أنيميشن
+        TweenService:Create(loadingFrame, TweenInfo.new(0.8, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+            BackgroundTransparency = 0,
+            Size = UDim2.new(0, 420, 0, 140),
+            Position = UDim2.new(0.5, 0, 0.5, 0)
+        }):Play()
+        TweenService:Create(shadow, TweenInfo.new(0.8, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            ImageTransparency = 0.6
+        }):Play()
+
+        -- تحميل تدريجي
+        local totalTime, steps = 3, 30
+        for i = 1, steps do
+            local progress = math.floor((i / steps) * 100)
+            label.Text = ("جار التحميل... %d%%"):format(progress)
+            TweenService:Create(bar, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                Size = UDim2.new(progress / 100, 0, 1, 0)
+            }):Play()
+            task.wait(totalTime / steps)
+        end
+
+        local ding = Instance.new("Sound", loadingFrame)
+        ding.SoundId = "rbxassetid://232127604"
+        ding.Volume = 2
+        pcall(function() ding:Play() end)
+
+        local greetings = {
+            "منور يا %s 🌹",
+            "أهلاً وسهلاً فيك يا %s 👋",
+            "رجعت لنا يا %s 😎",
+            "كيف حالك يا %s؟ 🌟",
+            "نورت المكان يا %s ✨",
+            "يوم جميل يا %s 🌞",
+            "ياهلا بـ %s 🙌",
+            "رجعت الأسطورة %s 🔥"
+        }
+
+        local randomMsg = greetings[math.random(1, #greetings)]
+        label.Text = randomMsg:format(player.Name)
+
+        TweenService:Create(label, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+            TextSize = 28,
+            TextTransparency = 0
+        }):Play()
+        TweenService:Create(bar, TweenInfo.new(0.3), {
+            BackgroundColor3 = getgenv().CurrentTheme.Success
+        }):Play()
+
+        task.wait(1.0)
+
+        -- خروج شاشة التحميل
+        TweenService:Create(loadingFrame, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
+            Position = UDim2.new(0.5, 0, -0.2, 0),
+            BackgroundTransparency = 1
+        }):Play()
+        TweenService:Create(shadow, TweenInfo.new(0.4), { ImageTransparency = 1 }):Play()
+
+        task.wait(0.6)
+        pcall(function() loadingFrame:Destroy() end)
+
+        -- --------------------------------------------------
+        -- 🪟 Main Window (النافذة الرئيسية بتصميم النيون)
+        -- --------------------------------------------------
+
+        window = Instance.new("Frame")
+        window.Name = "MainWindow"
+        window.AnchorPoint = Vector2.new(0.5, 0.5)
+        window.Position = UDim2.new(0.5, 0, 0.5, 0)
+        window.Size = UDim2.new(0, 560, 0, 420)
+        window.BackgroundColor3 = getgenv().CurrentTheme.Background
+        window.BackgroundTransparency = 0.15
+        window.BorderSizePixel = 0
+        window.ClipsDescendants = true
+        window.ZIndex = 5
+        Instance.new("UICorner", window).CornerRadius = UDim.new(0, 18)
+        window.Parent = gui
+
+        local wStroke = Instance.new("UIStroke", window)
+        wStroke.Thickness = 3.2
+        wStroke.Transparency = 0.05
+        wStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+        wStroke.Color = getgenv().CurrentTheme.Highlight
+
+        local gradient = Instance.new("UIGradient", wStroke)
+        gradient.Rotation = 0
+        gradient.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0.00, getgenv().CurrentTheme.Highlight),
+            ColorSequenceKeypoint.new(0.25, Color3.fromRGB(255, 255, 255)),
+            ColorSequenceKeypoint.new(0.50, getgenv().CurrentTheme.Highlight),
+            ColorSequenceKeypoint.new(0.75, getgenv().CurrentTheme.Highlight),
+            ColorSequenceKeypoint.new(1.00, getgenv().CurrentTheme.Highlight)
+        })
+
+        local glowWindow = Instance.new("ImageLabel", window)
+        glowWindow.Name = "NeonGlow"
+        glowWindow.Size = UDim2.new(1, 70, 1, 70)
+        glowWindow.Position = UDim2.new(0.5, 0, 0.5, 0)
+        glowWindow.AnchorPoint = Vector2.new(0.5, 0.5)
+        glowWindow.BackgroundTransparency = 1
+        glowWindow.Image = "rbxassetid://4996891970"
+        glowWindow.ImageColor3 = getgenv().CurrentTheme.Highlight
+        glowWindow.ImageTransparency = 0.6
+        glowWindow.ZIndex = 4
+
+        local function updateWindowNeonColor()
+            local t = getgenv().CurrentTheme
+            wStroke.Color = t.Highlight
+            glowWindow.ImageColor3 = t.Highlight
+            gradient.Color = ColorSequence.new({
+                ColorSequenceKeypoint.new(0.00, t.Highlight),
+                ColorSequenceKeypoint.new(0.25, Color3.fromRGB(255, 255, 255)),
+                ColorSequenceKeypoint.new(0.50, t.Highlight),
+                ColorSequenceKeypoint.new(0.75, t.Highlight),
+                ColorSequenceKeypoint.new(1.00, t.Highlight)
+            })
+            window.BackgroundColor3 = t.Background
+        end
+        updateWindowNeonColor()
+        table.insert(getgenv().ExtraThemeFunctions, updateWindowNeonColor)
+
+        getgenv().FelixzLoops["NeonGlowAnim"] = task.spawn(function()
+            while window.Parent do
+                gradient.Rotation = (gradient.Rotation + 2) % 360
+                task.wait(0.03)
+            end
         end)
 
-        -- Draggable
+        -- --------------------------------------------------
+        -- 📌 Draggable Logic (منطق السحب)
+        -- --------------------------------------------------
         local dragging, dragStart, startPos
-        TitleBar.InputBegan:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        window.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 and not minimized then
                 dragging = true
                 dragStart = input.Position
-                startPos = Main.Position
+                startPos = window.Position
                 input.Changed:Connect(function()
                     if input.UserInputState == Enum.UserInputState.End then dragging = false end
                 end)
             end
         end)
-        UserInputService.InputChanged:Connect(function(input)
-            if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        getgenv().FelixzConnections["DragInputChanged"] = UserInputService.InputChanged:Connect(function(input)
+            if dragging and input.UserInputType == Enum.UserInputType.MouseMovement and not minimized then
                 local delta = input.Position - dragStart
-                Main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+                window.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
             end
         end)
 
-        -- Tabs Container
-        local TabButtons = Instance.new("Frame", Main)
+
+        -- --------------------------------------------------
+        -- 📊 Title Bar (شريط العنوان الجديد)
+        -- --------------------------------------------------
+        titleBar = Instance.new("Frame")
+        titleBar.Size = UDim2.new(1,0,0,38)
+        titleBar.BackgroundColor3 = getgenv().CurrentTheme.Accent
+        titleBar.BorderSizePixel = 0
+        titleBar.ZIndex = 50
+        titleBar.ClipsDescendants = true
+        local titleCorner = Instance.new("UICorner", titleBar)
+        titleCorner.CornerRadius = UDim.new(0,18, 0, 0) -- Top corners only (Adjusted to match your corner radius)
+        titleBar.Parent = window
+
+        local titleContainer = Instance.new("Frame", titleBar)
+        titleContainer.Size = UDim2.new(1, -80, 1, 0)
+        titleContainer.Position = UDim2.new(0, 14, 0, 0)
+        titleContainer.BackgroundTransparency = 1
+        titleContainer.ZIndex = 51
+
+        local title = Instance.new("TextLabel", titleContainer)
+        title.Text = Config.Name
+        title.Font = Enum.Font.GothamBold
+        title.TextSize = 16
+        title.TextColor3 = getgenv().CurrentTheme.Text
+        title.BackgroundTransparency = 1
+        title.Size = UDim2.new(0, 100, 1, 0)
+        title.TextXAlignment = Enum.TextXAlignment.Left
+
+        local pingLabel = Instance.new("TextLabel", titleContainer)
+        pingLabel.Text = "PING: 0ms"
+        pingLabel.Font = Enum.Font.GothamBold
+        pingLabel.TextSize = 14
+        pingLabel.TextColor3 = getgenv().CurrentTheme.Text
+        pingLabel.BackgroundTransparency = 1
+        pingLabel.Size = UDim2.new(0, 100, 1, 0)
+        pingLabel.Position = UDim2.new(0, 110, 0, 0)
+        pingLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+        local fpsLabel = Instance.new("TextLabel", titleContainer)
+        fpsLabel.Text = "FPS: 0"
+        fpsLabel.Font = Enum.Font.GothamBold
+        fpsLabel.TextSize = 14
+        fpsLabel.TextColor3 = getgenv().CurrentTheme.Text
+        fpsLabel.BackgroundTransparency = 1
+        fpsLabel.Size = UDim2.new(0, 80, 1, 0)
+        fpsLabel.Position = UDim2.new(0, 210, 0, 0)
+        fpsLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+        local deviceLabel = Instance.new("TextLabel", titleContainer)
+        local device, emoji = getDeviceType(true)
+        deviceLabel.Text = "Device: " .. device .. " " .. emoji
+        deviceLabel.Font = Enum.Font.GothamBold
+        deviceLabel.TextSize = 14
+        deviceLabel.TextColor3 = getgenv().CurrentTheme.Text
+        deviceLabel.BackgroundTransparency = 1
+        deviceLabel.Size = UDim2.new(0, 150, 1, 0)
+        deviceLabel.Position = UDim2.new(0, 300, 0, 0)
+        deviceLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+        local lastUpdate = tick()
+        local frameCounter = 0
+        getgenv().FelixzConnections["FPS_PING_Update"] = RunService.RenderStepped:Connect(function()
+            frameCounter += 1
+            local now = tick()
+
+            if now - lastUpdate >= 0.25 then
+                local fps = math.floor(frameCounter / (now - lastUpdate))
+                frameCounter = 0
+                lastUpdate = now
+
+                local fpsColor = (fps >= 100 and Color3.fromRGB(0, 255, 0)) or (fps >= 60 and Color3.fromRGB(255, 220, 0)) or Color3.fromRGB(255, 80, 80)
+                fpsLabel.TextColor3 = fpsColor
+                fpsLabel.Text = "FPS: " .. tostring(fps)
+            end
+
+            local ok, val = pcall(function() return Stats.Network.ServerStatsItem["Data Ping"]:GetValue() end)
+            if ok and val then
+                local ping = math.floor(val)
+                local pingColor = (ping <= 60 and Color3.fromRGB(0, 255, 0)) or (ping <= 130 and Color3.fromRGB(255, 220, 0)) or Color3.fromRGB(255, 80, 80)
+                pingLabel.TextColor3 = pingColor
+                pingLabel.Text = "PING: " .. ping .. "ms"
+            end
+        end)
+
+        -- --------------------------------------------------
+        -- ❌ Min/Close Buttons (الأزرار العلوية)
+        -- --------------------------------------------------
+
+        local function makeTopBtn(txt, isClose)
+            local theme = getgenv().CurrentTheme
+            local b = Instance.new("TextButton")
+            b.Text = txt
+            b.Font = Enum.Font.GothamBold
+            b.TextSize = 16
+            b.TextColor3 = theme.Text
+            b.AutoButtonColor = false
+            b.Size = UDim2.fromOffset(32, 24)
+            b.BackgroundColor3 = theme.Accent
+            b.BorderSizePixel = 0
+            b.ZIndex = 1000
+            b.Parent = titleBar
+            Instance.new("UICorner", b).CornerRadius = UDim.new(0, 6)
+
+            local uiStroke = Instance.new("UIStroke", b)
+            uiStroke.Color = theme.Highlight
+            uiStroke.Thickness = 1
+            uiStroke.Transparency = 0.4
+
+            b.MouseEnter:Connect(function()
+                local t = getgenv().CurrentTheme
+                TweenService:Create(b, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {
+                    Size = UDim2.fromOffset(36, 26),
+                    BackgroundColor3 = isClose and Color3.fromRGB(200, 60, 60) or t.Hover,
+                    TextColor3 = Color3.fromRGB(255, 255, 255)
+                }):Play()
+            end)
+
+            b.MouseLeave:Connect(function()
+                local t = getgenv().CurrentTheme
+                TweenService:Create(b, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {
+                    Size = UDim2.fromOffset(32, 24),
+                    BackgroundColor3 = t.Accent,
+                    TextColor3 = t.Text
+                }):Play()
+            end)
+
+            return b
+        end
+
+        local closeBtn = makeTopBtn("X", true)
+        closeBtn.AnchorPoint = Vector2.new(1, 0)
+        closeBtn.Position = UDim2.new(1, -6, 0.5, -12)
+
+        local minBtn = makeTopBtn("—", false)
+        minBtn.AnchorPoint = Vector2.new(1, 0)
+        minBtn.Position = UDim2.new(1, -46, 0.5, -12)
+
+        local minimized = false
+
+        -- 🧩 منطق الإغلاق والتصغير (تم دمج منطقك الجديد)
+        local isConfirmationOpen = false
+
+        local function closeGUIWithAnimation()
+            local theme = getgenv().CurrentTheme
+            local tweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+
+            -- إيقاف التوغلات
+            if getgenv().AllToggles then
+                for toggleName, toggleState in pairs(getgenv().AllToggles) do
+                    if toggleState == true then
+                        local setter = getgenv().ToggleSetters and getgenv().ToggleSetters[toggleName]
+                        if setter then setter(false, true) end
+                    end
+                end
+            end
+            -- إيقاف الـ loops
+            if getgenv().FelixzLoops then
+                for name, thread in pairs(getgenv().FelixzLoops) do
+                    pcall(function() task.cancel(thread) end)
+                end
+            end
+
+            -- أنيميشن الإغلاق
+            if window and window.Parent then
+                local centerTween = TweenService:Create(window, TweenInfo.new(0.25, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), { Position = UDim2.new(0.5, 0, 0.5, 0) })
+                centerTween:Play()
+                centerTween.Completed:Wait()
+
+                TweenService:Create(window, tweenInfo, { BackgroundTransparency = 1, Size = UDim2.fromOffset(0, 0) }):Play()
+            end
+
+            task.wait(0.5)
+
+            -- التنظيف النهائي
+            pcall(function()
+                if getgenv().FelixzConnections then
+                    for _, conn in pairs(getgenv().FelixzConnections) do if typeof(conn) == "RBXScriptConnection" then pcall(function() conn:Disconnect() end) end end
+                    getgenv().FelixzConnections = nil
+                end
+                getgenv().ToggleSetters = nil
+                getgenv().AllToggles = nil
+                getgenv().FelixzLoops = nil
+            end)
+
+            if gui and gui.Parent then gui:Destroy() end
+        end
+
+        local function showConfirmation()
+            if isConfirmationOpen then return end
+            isConfirmationOpen = true
+            local theme = getgenv().CurrentTheme
+
+            window.Active = false
+            window.Selectable = false
+
+            local confirmFrame = Instance.new("Frame")
+            confirmFrame.Size = UDim2.fromOffset(0, 0)
+            confirmFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+            confirmFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+            confirmFrame.BackgroundColor3 = theme.Accent
+            confirmFrame.BorderSizePixel = 0
+            confirmFrame.ZIndex = 10000
+            confirmFrame.ClipsDescendants = true
+            confirmFrame.Parent = gui
+            Instance.new("UICorner", confirmFrame).CornerRadius = UDim.new(0, 16)
+
+            local stroke = Instance.new("UIStroke", confirmFrame)
+            stroke.Color = theme.Highlight
+            stroke.Thickness = 1.5
+            stroke.Transparency = 0.3
+
+            -- ✨ أنيميشن الدخول
+            TweenService:Create(confirmFrame, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+                Size = UDim2.fromOffset(300, 150)
+            }):Play()
+            task.wait(0.5)
+
+            local titleConfirm = Instance.new("TextLabel", confirmFrame)
+            titleConfirm.Text = "تأكيد الإغلاق"
+            titleConfirm.Font = Enum.Font.GothamBold
+            titleConfirm.TextSize = 20
+            titleConfirm.TextColor3 = theme.Text
+            titleConfirm.BackgroundTransparency = 1
+            titleConfirm.Size = UDim2.new(1, 0, 0, 40)
+            titleConfirm.Position = UDim2.new(0, 0, 0, 10)
+
+            local msgConfirm = Instance.new("TextLabel", confirmFrame)
+            msgConfirm.Text = "هل أنت متأكد من إغلاق القائمة؟ سيتم إيقاف جميع التوغلات."
+            msgConfirm.Font = Enum.Font.Gotham
+            msgConfirm.TextSize = 13
+            msgConfirm.TextColor3 = theme.Text
+            msgConfirm.BackgroundTransparency = 1
+            msgConfirm.Size = UDim2.new(1, -20, 0, 40)
+            msgConfirm.Position = UDim2.new(0, 10, 0, 45)
+            msgConfirm.TextWrapped = true
+
+            local close = Instance.new("TextButton", confirmFrame)
+            close.Text = "إغلاق"
+            close.Size = UDim2.fromOffset(100, 30)
+            close.Position = UDim2.new(1, -110, 1, -40)
+            close.BackgroundColor3 = theme.Danger
+            close.TextColor3 = Color3.new(1, 1, 1)
+            Instance.new("UICorner", close).CornerRadius = UDim.new(0, 6)
+
+            local cancel = Instance.new("TextButton", confirmFrame)
+            cancel.Text = "إلغاء"
+            cancel.Size = UDim2.fromOffset(100, 30)
+            cancel.Position = UDim2.new(1, -215, 1, -40)
+            cancel.BackgroundColor3 = theme.Highlight
+            cancel.TextColor3 = Color3.new(1, 1, 1)
+            Instance.new("UICorner", cancel).CornerRadius = UDim.new(0, 6)
+
+            local function hideConfirmation()
+                TweenService:Create(confirmFrame, TweenInfo.new(0.3, Enum.EasingStyle.Sine, Enum.EasingDirection.In), {
+                    Size = UDim2.fromOffset(0, 0),
+                    BackgroundTransparency = 1
+                }):Play()
+                task.wait(0.3)
+                confirmFrame:Destroy()
+                isConfirmationOpen = false
+                window.Active = true
+                window.Selectable = true
+            end
+
+            close.MouseButton1Click:Connect(function()
+                closeGUIWithAnimation()
+                isConfirmationOpen = false
+            end)
+
+            cancel.MouseButton1Click:Connect(hideConfirmation)
+        end
+        closeBtn.MouseButton1Click:Connect(showConfirmation)
+
+
+        minBtn.MouseButton1Click:Connect(function()
+            minimized = not minimized
+            local targetSize = UDim2.new(0, 560, 0, 420)
+            local targetHeight = minimized and 38 or targetSize.Y.Offset
+
+            if minimized then
+                pcall(function() dragging = false end)
+                if container then container.Visible = false end
+            end
+
+            local t = TweenService:Create(window, TweenInfo.new(0.18, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {
+                Size = UDim2.fromOffset(window.AbsoluteSize.X, targetHeight)
+            })
+            t:Play()
+
+            t.Completed:Wait()
+
+            if not minimized and container then
+                container.Visible = true
+            end
+
+            minBtn.Text = minimized and "▢" or "—"
+        end)
+
+
+        -- --------------------------------------------------
+        -- 📑 Tabs and Content (حاوية الألسنة والمحتوى)
+        -- --------------------------------------------------
+
+        -- الحاوية الكبيرة للألسنة والمحتوى (باقي النافذة تحت شريط العنوان)
+        container = Instance.new("Frame", window)
+        container.Name = "MainContentContainer"
+        container.Size = UDim2.new(1, 0, 1, -38)
+        container.Position = UDim2.new(0, 0, 0, 38)
+        container.BackgroundTransparency = 1
+
+        local TabButtons = Instance.new("Frame", container)
         TabButtons.Name = "TabButtons"
-        TabButtons.Size = UDim2.new(0, 150, 1, -50)
-        TabButtons.Position = UDim2.new(0, 0, 0, 50)
+        TabButtons.Size = UDim2.new(0, 150, 1, -20)
+        TabButtons.Position = UDim2.new(0, 10, 0, 10)
         TabButtons.BackgroundTransparency = 1
         local TabList = Instance.new("UIListLayout", TabButtons)
-        TabList.Padding = UDim.new(0, 5)
+        TabList.Padding = UDim.new(0, 8)
         TabList.SortOrder = Enum.SortOrder.LayoutOrder
-        TabButtons.Parent = Main
 
-        local TabContent = Instance.new("Frame", Main)
+        local TabContent = Instance.new("Frame", container)
         TabContent.Name = "TabContent"
-        TabContent.Size = UDim2.new(1, -160, 1, -50)
-        TabContent.Position = UDim2.new(0, 150, 0, 50)
+        TabContent.Size = UDim2.new(1, -170, 1, -20)
+        TabContent.Position = UDim2.new(0, 160, 0, 10)
         TabContent.BackgroundTransparency = 1
-        TabContent.Parent = Main
+        TabContent.ClipsDescendants = true
 
-        -- Create Tab Function (دعم Icons)
+        -- ✨ إظهار النافذة بعد أنيميشن شاشة التحميل
+        if Window.KeyVerified then
+            window.Visible = true
+            local targetSize = window.Size
+            window.Size = UDim2.new(0, 0, 0, 0)
+            window.AnchorPoint = Vector2.new(0.5, 0.5)
+            window.Position = UDim2.new(0.5, 0, 0.5, 0)
+
+            TweenService:Create(window, TweenInfo.new(0.9, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+                Size = targetSize
+            }):Play()
+
+            local flash = Instance.new("Frame")
+            flash.Size = UDim2.fromScale(1, 1)
+            flash.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+            flash.BackgroundTransparency = 0.2
+            flash.BorderSizePixel = 0
+            flash.ZIndex = 10
+            flash.Parent = window
+            TweenService:Create(flash, TweenInfo.new(0.8, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                BackgroundTransparency = 1
+            }):Play()
+
+            FelixzUI:Notify("📱 Device Detected", "تم اكتشاف جهازك: "..device.." "..emoji, 3, nil, "Primary")
+        end
+
+
+        -- Create Tab Function
         function Window:CreateTab(TabConfig)
             TabConfig = TabConfig or {}
             TabConfig.Name = TabConfig.Name or "Tab"
-            TabConfig.Icon = TabConfig.Icon or "rbxassetid://4483345998"  -- Default gear icon
+            TabConfig.Icon = TabConfig.Icon or "rbxassetid://4483345998"
 
             local Tab = {}
             Tab.Sections = {}
@@ -341,52 +969,55 @@ function FelixzUI:CreateWindow(Config)
 
             local Button = Instance.new("TextButton")
             Button.Name = TabConfig.Name
-            Button.Size = UDim2.new(1, -10, 0, 45)
-            Button.Position = UDim2.new(0, 5, 0, (#Window.Tabs * 50))
-            Button.BackgroundColor3 = FelixzUI.CurrentTheme.Accent
+            Button.Size = UDim2.new(1, 0, 0, 45)
+            Button.Position = UDim2.new(0, 0, 0, (#Window.Tabs * 50))
+            Button.BackgroundColor3 = getgenv().CurrentTheme.Accent
             Button.BorderSizePixel = 0
             Button.Text = ""
             Button.AutoButtonColor = false
             Button.LayoutOrder = #Window.Tabs
             local BtnCorner = Instance.new("UICorner", Button)
             BtnCorner.CornerRadius = UDim.new(0, 10)
+
             local BtnStroke = Instance.new("UIStroke", Button)
-            BtnStroke.Color = FelixzUI.CurrentTheme.Primary
+            BtnStroke.Color = getgenv().CurrentTheme.Highlight
             BtnStroke.Thickness = 1
             BtnStroke.Transparency = 0.5
             Button.Parent = TabButtons
+            Tab.Button = Button
+            Tab.BtnStroke = BtnStroke
 
-            -- Icon
             local Icon = Instance.new("ImageLabel", Button)
             Icon.Size = UDim2.new(0, 24, 0, 24)
             Icon.Position = UDim2.new(0, 10, 0.5, -12)
             Icon.BackgroundTransparency = 1
             Icon.Image = TabConfig.Icon
-            Icon.ImageColor3 = FelixzUI.CurrentTheme.Text
+            Icon.ImageColor3 = getgenv().CurrentTheme.Text
 
-            -- Name
             local Name = Instance.new("TextLabel", Button)
             Name.Text = TabConfig.Name
             Name.Font = Enum.Font.GothamSemibold
             Name.TextSize = 14
-            Name.TextColor3 = FelixzUI.CurrentTheme.Text
+            Name.TextColor3 = getgenv().CurrentTheme.Text
             Name.BackgroundTransparency = 1
             Name.Size = UDim2.new(1, -50, 1, 0)
             Name.Position = UDim2.new(0, 40, 0, 0)
             Name.TextXAlignment = Enum.TextXAlignment.Left
 
-            -- Content
+            -- Content Frame
             local Content = Instance.new("ScrollingFrame")
             Content.Name = "Content"
-            Content.Size = UDim2.new(1, -20, 1, -20)
-            Content.Position = UDim2.new(0, 10, 0, 10)
+            Content.Size = UDim2.fromScale(1, 1)
+            Content.Position = UDim2.new(0, 0, 0, 0)
             Content.BackgroundTransparency = 1
             Content.BorderSizePixel = 0
             Content.ScrollBarThickness = 6
-            Content.ScrollBarImageColor3 = FelixzUI.CurrentTheme.Primary
+            Content.ScrollBarImageColor3 = getgenv().CurrentTheme.Highlight
             Content.Visible = false
             Content.CanvasSize = UDim2.new(0, 0, 0, 0)
             Content.Parent = TabContent
+            Tab.Content = Content
+
             local ContentLayout = Instance.new("UIListLayout", Content)
             ContentLayout.Padding = UDim.new(0, 10)
             ContentLayout.SortOrder = Enum.SortOrder.LayoutOrder
@@ -395,28 +1026,27 @@ function FelixzUI:CreateWindow(Config)
             Button.MouseButton1Click:Connect(function()
                 for _, t in pairs(Window.Tabs) do
                     t.Content.Visible = false
-                    t.Button.BackgroundColor3 = FelixzUI.CurrentTheme.Accent
-                    t.BtnStroke.Transparency = 0.5
+                    TweenService:Create(t.Button, TweenInfo.new(0.2), {BackgroundColor3 = getgenv().CurrentTheme.Accent}):Play()
+                    TweenService:Create(t.BtnStroke, TweenInfo.new(0.2), {Transparency = 0.5}):Play()
                     t.Active = false
                 end
                 Content.Visible = true
-                Button.BackgroundColor3 = FelixzUI.CurrentTheme.Primary
-                BtnStroke.Transparency = 0
+                TweenService:Create(Button, TweenInfo.new(0.2), {BackgroundColor3 = getgenv().CurrentTheme.Highlight}):Play()
+                TweenService:Create(BtnStroke, TweenInfo.new(0.2), {Transparency = 0}):Play()
                 Tab.Active = true
-                FelixzUI:Notify("Tab Switched", "Opened " .. TabConfig.Name, 1)
+                FelixzUI:Notify("Tab Switched", "Opened " .. TabConfig.Name, 1, nil, "Primary")
             end)
 
             -- Auto-activate first tab
             if #Window.Tabs == 0 then
                 Content.Visible = true
-                Button.BackgroundColor3 = FelixzUI.CurrentTheme.Primary
+                Button.BackgroundColor3 = getgenv().CurrentTheme.Highlight
                 BtnStroke.Transparency = 0
                 Tab.Active = true
             end
 
             table.insert(Window.Tabs, Tab)
 
-            -- Update Canvas
             ContentLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
                 Content.CanvasSize = UDim2.new(0, 0, 0, ContentLayout.AbsoluteContentSize.Y + 20)
             end)
@@ -430,14 +1060,14 @@ function FelixzUI:CreateWindow(Config)
 
                 local Frame = Instance.new("Frame")
                 Frame.Name = SectionConfig.Name
-                Frame.Size = UDim2.new(1, -20, 0, 40)  -- Initial size
-                Frame.BackgroundColor3 = FelixzUI.CurrentTheme.Accent
+                Frame.Size = UDim2.new(1, 0, 0, 40)
+                Frame.BackgroundColor3 = getgenv().CurrentTheme.Accent
                 Frame.BackgroundTransparency = 0.3
                 Frame.BorderSizePixel = 0
                 local FrameCorner = Instance.new("UICorner", Frame)
                 FrameCorner.CornerRadius = UDim.new(0, 12)
                 local FrameStroke = Instance.new("UIStroke", Frame)
-                FrameStroke.Color = FelixzUI.CurrentTheme.Primary
+                FrameStroke.Color = getgenv().CurrentTheme.Highlight
                 FrameStroke.Thickness = 1
                 FrameStroke.Transparency = 0.7
                 Frame.Parent = Content
@@ -447,7 +1077,7 @@ function FelixzUI:CreateWindow(Config)
                 Title.Text = SectionConfig.Name
                 Title.Font = Enum.Font.GothamBold
                 Title.TextSize = 16
-                Title.TextColor3 = FelixzUI.CurrentTheme.Text
+                Title.TextColor3 = getgenv().CurrentTheme.Text
                 Title.BackgroundTransparency = 1
                 Title.Size = UDim2.new(1, 0, 0, 35)
                 Title.Position = UDim2.new(0, 15, 0, 5)
@@ -464,12 +1094,11 @@ function FelixzUI:CreateWindow(Config)
                 Layout.Padding = UDim.new(0, 8)
                 Layout.FillDirection = Enum.FillDirection.Vertical
 
-                -- Update Section Size
                 Layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-                    Frame.Size = UDim2.new(1, -20, 0, Layout.AbsoluteContentSize.Y + 50)
+                    Frame.Size = UDim2.new(1, 0, 0, Layout.AbsoluteContentSize.Y + 50)
                 end)
 
-                -- Toggle Element
+                -- Toggle Element (No change in logic, only colors/theme access)
                 function Section:Toggle(ToggleConfig)
                     ToggleConfig = ToggleConfig or {}
                     ToggleConfig.Name = ToggleConfig.Name or "Toggle"
@@ -478,6 +1107,8 @@ function FelixzUI:CreateWindow(Config)
 
                     local Toggle = {}
                     local Value = ToggleConfig.Default
+                    getgenv().AllToggles[ToggleConfig.Name] = Value
+
                     local Row = Instance.new("Frame")
                     Row.Size = UDim2.new(1, 0, 0, 35)
                     Row.BackgroundTransparency = 1
@@ -487,7 +1118,7 @@ function FelixzUI:CreateWindow(Config)
                     Label.Text = ToggleConfig.Name
                     Label.Font = Enum.Font.Gotham
                     Label.TextSize = 14
-                    Label.TextColor3 = FelixzUI.CurrentTheme.Text
+                    Label.TextColor3 = getgenv().CurrentTheme.Text
                     Label.BackgroundTransparency = 1
                     Label.Size = UDim2.new(1, -60, 1, 0)
                     Label.TextXAlignment = Enum.TextXAlignment.Left
@@ -495,7 +1126,7 @@ function FelixzUI:CreateWindow(Config)
                     local ToggleFrame = Instance.new("Frame", Row)
                     ToggleFrame.Size = UDim2.new(0, 40, 0, 20)
                     ToggleFrame.Position = UDim2.new(1, -50, 0.5, -10)
-                    ToggleFrame.BackgroundColor3 = Value and FelixzUI.CurrentTheme.Success or FelixzUI.CurrentTheme.Danger
+                    ToggleFrame.BackgroundColor3 = Value and getgenv().CurrentTheme.Success or getgenv().CurrentTheme.Danger
                     ToggleFrame.BorderSizePixel = 0
                     local ToggleCorner = Instance.new("UICorner", ToggleFrame)
                     ToggleCorner.CornerRadius = UDim.new(0, 10)
@@ -513,19 +1144,25 @@ function FelixzUI:CreateWindow(Config)
                     ClickBtn.BackgroundTransparency = 1
                     ClickBtn.Text = ""
 
-                    ClickBtn.MouseButton1Click:Connect(function()
-                        Value = not Value
+                    local function toggle(newValue, isInternal)
+                        Value = newValue
+                        getgenv().AllToggles[ToggleConfig.Name] = Value
                         TweenService:Create(ToggleFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {
-                            BackgroundColor3 = Value and FelixzUI.CurrentTheme.Success or FelixzUI.CurrentTheme.Danger
+                            BackgroundColor3 = Value and getgenv().CurrentTheme.Success or getgenv().CurrentTheme.Danger
                         }):Play()
                         TweenService:Create(Knob, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {
                             Position = Value and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 2, 0.5, -8)
                         }):Play()
-                        ToggleConfig.Callback(Value)
-                        FelixzUI:Notify(ToggleConfig.Name, Value and "Enabled" or "Disabled", 1)
+                        if not isInternal then
+                            ToggleConfig.Callback(Value)
+                            FelixzUI:Notify(ToggleConfig.Name, Value and "Enabled" or "Disabled", 1, nil, Value and "Success" or "Danger")
+                        end
+                    end
+
+                    ClickBtn.MouseButton1Click:Connect(function()
+                        toggle(not Value, false)
                     end)
 
-                    -- Hover Effects
                     ClickBtn.MouseEnter:Connect(function()
                         TweenService:Create(ToggleFrame, TweenInfo.new(0.1), {Size = UDim2.new(0, 42, 0, 22)}):Play()
                     end)
@@ -533,16 +1170,15 @@ function FelixzUI:CreateWindow(Config)
                         TweenService:Create(ToggleFrame, TweenInfo.new(0.1), {Size = UDim2.new(0, 40, 0, 20)}):Play()
                     end)
 
-                    function Toggle:Set(newValue)
-                        Value = newValue
-                        TweenService:Create(ToggleFrame, TweenInfo.new(0.2), {BackgroundColor3 = Value and FelixzUI.CurrentTheme.Success or FelixzUI.CurrentTheme.Danger}):Play()
-                        TweenService:Create(Knob, TweenInfo.new(0.2), {Position = Value and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 2, 0.5, -8)}):Play()
-                        ToggleConfig.Callback(Value)
+                    function Toggle:Set(newValue, isInternal)
+                        toggle(newValue, isInternal)
                     end
 
                     function Toggle:Get()
                         return Value
                     end
+
+                    getgenv().ToggleSetters[ToggleConfig.Name] = toggle
 
                     return Toggle
                 end
@@ -567,7 +1203,7 @@ function FelixzUI:CreateWindow(Config)
                     Label.Text = SliderConfig.Name
                     Label.Font = Enum.Font.Gotham
                     Label.TextSize = 14
-                    Label.TextColor3 = FelixzUI.CurrentTheme.Text
+                    Label.TextColor3 = getgenv().CurrentTheme.Text
                     Label.BackgroundTransparency = 1
                     Label.Size = UDim2.new(1, -60, 0, 20)
                     Label.Position = UDim2.new(0, 0, 0, 5)
@@ -576,7 +1212,7 @@ function FelixzUI:CreateWindow(Config)
                     ValueLabel.Text = tostring(Value)
                     ValueLabel.Font = Enum.Font.GothamBold
                     ValueLabel.TextSize = 14
-                    ValueLabel.TextColor3 = FelixzUI.CurrentTheme.Primary
+                    ValueLabel.TextColor3 = getgenv().CurrentTheme.Highlight
                     ValueLabel.BackgroundTransparency = 1
                     ValueLabel.Size = UDim2.new(0, 50, 0, 20)
                     ValueLabel.Position = UDim2.new(1, -60, 0, 5)
@@ -585,21 +1221,22 @@ function FelixzUI:CreateWindow(Config)
                     local SliderFrame = Instance.new("Frame", Row)
                     SliderFrame.Size = UDim2.new(1, 0, 0, 8)
                     SliderFrame.Position = UDim2.new(0, 0, 0, 30)
-                    SliderFrame.BackgroundColor3 = FelixzUI.CurrentTheme.Accent
+                    SliderFrame.BackgroundColor3 = getgenv().CurrentTheme.Accent
                     SliderFrame.BorderSizePixel = 0
                     local SliderCorner = Instance.new("UICorner", SliderFrame)
                     SliderCorner.CornerRadius = UDim.new(0, 4)
 
+                    local Percent = (Value - SliderConfig.Min) / (SliderConfig.Max - SliderConfig.Min)
                     local Fill = Instance.new("Frame", SliderFrame)
-                    Fill.Size = UDim2.new((Value - SliderConfig.Min) / (SliderConfig.Max - SliderConfig.Min), 0, 1, 0)
-                    Fill.BackgroundColor3 = FelixzUI.CurrentTheme.Primary
+                    Fill.Size = UDim2.new(Percent, 0, 1, 0)
+                    Fill.BackgroundColor3 = getgenv().CurrentTheme.Highlight
                     Fill.BorderSizePixel = 0
                     local FillCorner = Instance.new("UICorner", Fill)
                     FillCorner.CornerRadius = UDim.new(0, 4)
 
                     local Thumb = Instance.new("Frame", SliderFrame)
                     Thumb.Size = UDim2.new(0, 16, 0, 16)
-                    Thumb.Position = UDim2.new((Value - SliderConfig.Min) / (SliderConfig.Max - SliderConfig.Min), -8, -0.5, -4)
+                    Thumb.Position = UDim2.new(Percent, -8, -0.5, -4)
                     Thumb.BackgroundColor3 = Color3.new(1,1,1)
                     Thumb.BorderSizePixel = 0
                     local ThumbCorner = Instance.new("UICorner", Thumb)
@@ -624,11 +1261,11 @@ function FelixzUI:CreateWindow(Config)
                             local MouseX = input.Position.X
                             local SliderAbsX = SliderFrame.AbsolutePosition.X
                             local SliderWidth = SliderFrame.AbsoluteSize.X
-                            local Percent = math.clamp((MouseX - SliderAbsX) / SliderWidth, 0, 1)
-                            local NewValue = math.floor(SliderConfig.Min + (SliderConfig.Max - SliderConfig.Min) * Percent)
+                            local NewPercent = math.clamp((MouseX - SliderAbsX) / SliderWidth, 0, 1)
+                            local NewValue = math.floor(SliderConfig.Min + (SliderConfig.Max - SliderConfig.Min) * NewPercent)
                             Value = NewValue
-                            Fill.Size = UDim2.new(Percent, 0, 1, 0)
-                            Thumb.Position = UDim2.new(Percent, -8, -0.5, -4)
+                            Fill.Size = UDim2.new(NewPercent, 0, 1, 0)
+                            Thumb.Position = UDim2.new(NewPercent, -8, -0.5, -4)
                             ValueLabel.Text = tostring(NewValue)
                             SliderConfig.Callback(NewValue)
                         end
@@ -637,9 +1274,9 @@ function FelixzUI:CreateWindow(Config)
                     function Slider:Set(newValue)
                         newValue = math.clamp(newValue, SliderConfig.Min, SliderConfig.Max)
                         Value = newValue
-                        local Percent = (newValue - SliderConfig.Min) / (SliderConfig.Max - SliderConfig.Min)
-                        Fill.Size = UDim2.new(Percent, 0, 1, 0)
-                        Thumb.Position = UDim2.new(Percent, -8, -0.5, -4)
+                        local NewPercent = (newValue - SliderConfig.Min) / (SliderConfig.Max - SliderConfig.Min)
+                        Fill.Size = UDim2.new(NewPercent, 0, 1, 0)
+                        Thumb.Position = UDim2.new(NewPercent, -8, -0.5, -4)
                         ValueLabel.Text = tostring(newValue)
                         SliderConfig.Callback(newValue)
                     end
@@ -660,7 +1297,7 @@ function FelixzUI:CreateWindow(Config)
 
                     local Btn = Instance.new("TextButton")
                     Btn.Size = UDim2.new(1, 0, 0, 40)
-                    Btn.BackgroundColor3 = FelixzUI.CurrentTheme.Primary
+                    Btn.BackgroundColor3 = getgenv().CurrentTheme.Highlight
                     Btn.BorderSizePixel = 0
                     Btn.Text = ButtonConfig.Name
                     Btn.Font = Enum.Font.GothamBold
@@ -677,7 +1314,7 @@ function FelixzUI:CreateWindow(Config)
                         Icn.Position = UDim2.new(0, 10, 0.5, -10)
                         Icn.BackgroundTransparency = 1
                         Icn.Image = ButtonConfig.Icon
-                        Btn.Text = "  " .. ButtonConfig.Name  -- Space for icon
+                        Btn.Text = "  " .. ButtonConfig.Name
                     end
 
                     Btn.MouseButton1Click:Connect(function()
@@ -685,253 +1322,17 @@ function FelixzUI:CreateWindow(Config)
                         task.wait(0.1)
                         TweenService:Create(Btn, TweenInfo.new(0.1, Enum.EasingStyle.Back), {Size = UDim2.new(1, 0, 0, 40)}):Play()
                         ButtonConfig.Callback()
-                        FelixzUI:Notify(ButtonConfig.Name, "Clicked!", 1.5)
+                        FelixzUI:Notify(ButtonConfig.Name, "Clicked!", 1.5, nil, "Primary")
                     end)
 
                     Btn.MouseEnter:Connect(function()
-                        TweenService:Create(Btn, TweenInfo.new(0.2), {BackgroundColor3 = FelixzUI.CurrentTheme.Primary:lerp(Color3.new(1,1,1), 0.2)}):Play()
+                        TweenService:Create(Btn, TweenInfo.new(0.2), {BackgroundColor3 = getgenv().CurrentTheme.Hover}):Play()
                     end)
                     Btn.MouseLeave:Connect(function()
-                        TweenService:Create(Btn, TweenInfo.new(0.2), {BackgroundColor3 = FelixzUI.CurrentTheme.Primary}):Play()
+                        TweenService:Create(Btn, TweenInfo.new(0.2), {BackgroundColor3 = getgenv().CurrentTheme.Highlight}):Play()
                     end)
 
                     return Btn
-                end
-
-                -- Dropdown Element
-                function Section:Dropdown(DropdownConfig)
-                    DropdownConfig = DropdownConfig or {}
-                    DropdownConfig.Name = DropdownConfig.Name or "Dropdown"
-                    DropdownConfig.Options = DropdownConfig.Options or {"Option 1", "Option 2"}
-                    DropdownConfig.Default = DropdownConfig.Default or DropdownConfig.Options[1]
-                    DropdownConfig.Callback = DropdownConfig.Callback or function() end
-
-                    local Dropdown = {}
-                    local Selected = DropdownConfig.Default
-                    local Open = false
-                    local Row = Instance.new("Frame")
-                    Row.Size = UDim2.new(1, 0, 0, 35)
-                    Row.BackgroundTransparency = 1
-                    Row.Parent = Container
-
-                    local Label = Instance.new("TextLabel", Row)
-                    Label.Text = DropdownConfig.Name
-                    Label.Font = Enum.Font.Gotham
-                    Label.TextSize = 14
-                    Label.TextColor3 = FelixzUI.CurrentTheme.Text
-                    Label.BackgroundTransparency = 1
-                    Label.Size = UDim2.new(0.7, 0, 1, 0)
-
-                    local DropBtn = Instance.new("TextButton", Row)
-                    DropBtn.Size = UDim2.new(0, 120, 0, 30)
-                    DropBtn.Position = UDim2.new(0.7, 10, 0.5, -15)
-                    DropBtn.BackgroundColor3 = FelixzUI.CurrentTheme.Accent
-                    DropBtn.Text = Selected .. " ▼"
-                    DropBtn.Font = Enum.Font.Gotham
-                    DropBtn.TextSize = 13
-                    DropBtn.TextColor3 = FelixzUI.CurrentTheme.Text
-                    DropBtn.BorderSizePixel = 0
-                    local DropCorner = Instance.new("UICorner", DropBtn)
-                    DropCorner.CornerRadius = UDim.new(0, 6)
-                    DropBtn.Parent = Row
-
-                    local DropList = Instance.new("Frame")
-                    DropList.Size = UDim2.new(0, 120, 0, 0)
-                    DropList.Position = UDim2.new(0.7, 10, 1, 0)
-                    DropList.BackgroundColor3 = FelixzUI.CurrentTheme.Background
-                    DropList.BorderSizePixel = 0
-                    DropList.Visible = false
-                    local DropListCorner = Instance.new("UICorner", DropList)
-                    DropListCorner.CornerRadius = UDim.new(0, 6)
-                    DropList.Parent = Row
-                    local DropLayout = Instance.new("UIListLayout", DropList)
-                    DropLayout.Padding = UDim.new(0, 2)
-
-                    for _, Opt in ipairs(DropdownConfig.Options) do
-                        local OptBtn = Instance.new("TextButton", DropList)
-                        OptBtn.Size = UDim2.new(1, 0, 0, 25)
-                        OptBtn.BackgroundColor3 = FelixzUI.CurrentTheme.Accent
-                        OptBtn.Text = Opt
-                        OptBtn.Font = Enum.Font.Gotham
-                        OptBtn.TextSize = 12
-                        OptBtn.TextColor3 = FelixzUI.CurrentTheme.Text
-                        OptBtn.BorderSizePixel = 0
-                        local OptCorner = Instance.new("UICorner", OptBtn)
-                        OptCorner.CornerRadius = UDim.new(0, 4)
-                        OptBtn.MouseButton1Click:Connect(function()
-                            Selected = Opt
-                            DropBtn.Text = Opt .. " ▼"
-                            Open = false
-                            DropList.Visible = false
-                            DropdownConfig.Callback(Opt)
-                        end)
-                    end
-
-                    DropLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-                        DropList.Size = UDim2.new(0, 120, 0, DropLayout.AbsoluteContentSize.Y)
-                    end)
-
-                    DropBtn.MouseButton1Click:Connect(function()
-                        Open = not Open
-                        DropList.Visible = Open
-                        DropList.Position = Open and UDim2.new(0.7, 10, 1, 0) or UDim2.new(0.7, 10, 0.5, 15)
-                    end)
-
-                    function Dropdown:Set(newValue)
-                        Selected = newValue
-                        DropBtn.Text = newValue .. " ▼"
-                        DropdownConfig.Callback(newValue)
-                    end
-
-                    function Dropdown:Get()
-                        return Selected
-                    end
-
-                    return Dropdown
-                end
-
-                -- Keybind Element
-                function Section:Keybind(KeybindConfig)
-                    KeybindConfig = KeybindConfig or {}
-                    KeybindConfig.Name = KeybindConfig.Name or "Keybind"
-                    KeybindConfig.Default = KeybindConfig.Default or Enum.KeyCode.Q
-                    KeybindConfig.Callback = KeybindConfig.Callback or function() end
-
-                    local Keybind = {}
-                    local CurrentKey = KeybindConfig.Default
-                    local Listening = false
-                    local Row = Instance.new("Frame")
-                    Row.Size = UDim2.new(1, 0, 0, 35)
-                    Row.BackgroundTransparency = 1
-                    Row.Parent = Container
-
-                    local Label = Instance.new("TextLabel", Row)
-                    Label.Text = KeybindConfig.Name
-                    Label.Font = Enum.Font.Gotham
-                    Label.TextSize = 14
-                    Label.TextColor3 = FelixzUI.CurrentTheme.Text
-                    Label.BackgroundTransparency = 1
-                    Label.Size = UDim2.new(0.6, 0, 1, 0)
-
-                    local KeyBtn = Instance.new("TextButton", Row)
-                    KeyBtn.Size = UDim2.new(0, 100, 0, 30)
-                    KeyBtn.Position = UDim2.new(0.6, 10, 0.5, -15)
-                    KeyBtn.BackgroundColor3 = FelixzUI.CurrentTheme.Accent
-                    KeyBtn.Text = CurrentKey.Name
-                    KeyBtn.Font = Enum.Font.GothamBold
-                    KeyBtn.TextSize = 13
-                    KeyBtn.TextColor3 = FelixzUI.CurrentTheme.Text
-                    KeyBtn.BorderSizePixel = 0
-                    local KeyCorner = Instance.new("UICorner", KeyBtn)
-                    KeyCorner.CornerRadius = UDim.new(0, 6)
-                    KeyBtn.Parent = Row
-
-                    KeyBtn.MouseButton1Click:Connect(function()
-                        Listening = true
-                        KeyBtn.Text = "..."
-                        KeyBtn.BackgroundColor3 = FelixzUI.CurrentTheme.Primary
-                        local Conn
-                        Conn = UserInputService.InputBegan:Connect(function(input)
-                            if input.KeyCode ~= Enum.KeyCode.Unknown then
-                                CurrentKey = input.KeyCode
-                                KeyBtn.Text = CurrentKey.Name
-                                KeyBtn.BackgroundColor3 = FelixzUI.CurrentTheme.Accent
-                                Listening = false
-                                Conn:Disconnect()
-                                KeybindConfig.Callback(CurrentKey)
-                            end
-                        end)
-                    end)
-
-                    -- Global Hotkey Listener
-                    UserInputService.InputBegan:Connect(function(input)
-                        if input.KeyCode == CurrentKey and not Listening then
-                            KeybindConfig.Callback(CurrentKey)
-                        end
-                    end)
-
-                    function Keybind:Set(newKey)
-                        CurrentKey = newKey
-                        KeyBtn.Text = newKey.Name
-                        KeybindConfig.Callback(newKey)
-                    end
-
-                    function Keybind:Get()
-                        return CurrentKey
-                    end
-
-                    return Keybind
-                end
-
-                -- ColorPicker Element (بسيط)
-                function Section:ColorPicker(ColorConfig)
-                    ColorConfig = ColorConfig or {}
-                    ColorConfig.Name = ColorConfig.Name or "ColorPicker"
-                    ColorConfig.Default = ColorConfig.Default or Color3.new(1,0,0)
-                    ColorConfig.Callback = ColorConfig.Callback or function() end
-
-                    local Picker = {}
-                    local Value = ColorConfig.Default
-                    local Row = Instance.new("Frame")
-                    Row.Size = UDim2.new(1, 0, 0, 35)
-                    Row.BackgroundTransparency = 1
-                    Row.Parent = Container
-
-                    local Label = Instance.new("TextLabel", Row)
-                    Label.Text = ColorConfig.Name
-                    Label.Font = Enum.Font.Gotham
-                    Label.TextSize = 14
-                    Label.TextColor3 = FelixzUI.CurrentTheme.Text
-                    Label.BackgroundTransparency = 1
-                    Label.Size = UDim2.new(0.7, 0, 1, 0)
-
-                    local ColorPreview = Instance.new("Frame", Row)
-                    ColorPreview.Size = UDim2.new(0, 30, 0, 30)
-                    ColorPreview.Position = UDim2.new(0.7, 10, 0.5, -15)
-                    ColorPreview.BackgroundColor3 = Value
-                    ColorPreview.BorderSizePixel = 0
-                    local ColorCorner = Instance.new("UICorner", ColorPreview)
-                    ColorCorner.CornerRadius = UDim.new(0, 6)
-                    local ColorStroke = Instance.new("UIStroke", ColorPreview)
-                    ColorStroke.Color = FelixzUI.CurrentTheme.Text
-                    ColorStroke.Thickness = 1
-
-                    -- Simple Color Picker Popup (يمكن توسيعها)
-                    ColorPreview.InputBegan:Connect(function(input)
-                        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-                            -- Popup color wheel (simplified - use external lib if needed)
-                            FelixzUI:Notify("ColorPicker", "Select color (simplified - expand as needed)", 2)
-                            Value = Color3.new(math.random(), math.random(), math.random())  -- Random for demo
-                            ColorPreview.BackgroundColor3 = Value
-                            ColorConfig.Callback(Value)
-                        end
-                    end)
-
-                    function Picker:Set(newColor)
-                        Value = newColor
-                        ColorPreview.BackgroundColor3 = newColor
-                        ColorConfig.Callback(newColor)
-                    end
-
-                    function Picker:Get()
-                        return Value
-                    end
-
-                    return Picker
-                end
-
-                -- Themes Switcher (داخل Section)
-                function Section:ThemeSwitcher()
-                    local ThemesList = {}
-                    for Name, _ in pairs(FelixzUI.Themes) do
-                        table.insert(ThemesList, Name)
-                    end
-                    return Section:Dropdown({Name = "Theme", Options = ThemesList, Callback = function(selected)
-                        FelixzUI.CurrentTheme = FelixzUI.Themes[selected]
-                        -- Update all UI colors (global update function)
-                        FelixzUI:UpdateTheme(FelixzUI.CurrentTheme)
-                        FelixzUI:Notify("Theme", "Switched to " .. selected, 2)
-                    end})
                 end
 
                 table.insert(Tab.Sections, Section)
@@ -941,14 +1342,7 @@ function FelixzUI:CreateWindow(Config)
             return Tab
         end
 
-        -- Global Theme Update
-        function FelixzUI:UpdateTheme(Theme)
-            FelixzUI.CurrentTheme = Theme
-            -- Refresh all elements (add connections for live update)
-            FelixzUI:Notify("Theme Updated", "UI refreshed!", 2)
-        end
-
-        FelixzUI:Notify("Felixz UI Loaded", "v" .. FelixzUI.Version .. " - Ready to use! 🚀", 3, "rbxassetid://6031094687")  -- Rocket icon
+        return Window
     end
 
     if Window.KeyVerified then
@@ -957,16 +1351,5 @@ function FelixzUI:CreateWindow(Config)
 
     return Window
 end
-
--- Cleanup on destroy
-game:BindToClose(function()
-    for _, gui in pairs(CoreGui:GetChildren()) do
-        if gui.Name:find("Felixz") then
-            gui:Destroy()
-        end
-    end
-end)
-
-print("Felixz UI Library v2.0 Loaded Successfully! 🌟 - Credits: Felixz & Grok")
 
 return FelixzUI
