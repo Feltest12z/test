@@ -1,791 +1,1355 @@
--- ==========================================================
---  FelixzUI - Core Library (Full Source Code)
---  Version: 2.0 (with Advanced Theming and Particles)
--- ==========================================================
+-- ══════════════════════════════════════════════
+-- FelixzUI 2.0 - Core Library (Updated Design)
+-- ══════════════════════════════════════════════
+
+-- Core Roblox Services
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local HttpService = game:GetService("HttpService")
+local CoreGui = game:GetService("CoreGui")
+local GuiService = game:GetService("GuiService")
+
+local player = Players.LocalPlayer
+local Stats = game:GetService("Stats")
+
+-- جدول نخزن فيه كل دوال التوغلات (من الكود الجديد)
+getgenv().ToggleSetters = getgenv().ToggleSetters or {}
+getgenv().AllToggles = getgenv().AllToggles or {}
+getgenv().FelixzLoops = getgenv().FelixzLoops or {}
+getgenv().FelixzConnections = getgenv().FelixzConnections or {}
+
+
+-- دالة لتحديث أي توغل (لما نحمل config)
+getgenv().UpdateToggle = function(name, value)
+    local fn = getgenv().ToggleSetters[name]
+    if fn then
+        fn(value, true) -- true = لا تشغّل الحدث (لأننا نحمّل)
+    end
+end
+
+-- 🗂️ إعداد مجلد الحفظ
+local saveFolder = "workspace/FelixzHub/Configs"
+if not isfolder("workspace/FelixzHub") then
+    makefolder("workspace/FelixzHub")
+end
+if not isfolder(saveFolder) then
+    makefolder(saveFolder)
+end
+
+-- --------------------------------------------------
+-- 🎨 Themes (تم تحديث الثيمات لتبني الثيم الجديد)
+-- --------------------------------------------------
+
+-- ثيم افتراضي من الـ Settings
+getgenv().Themes = {
+    Dark = {
+        Background = Color3.fromRGB(16, 18, 29),
+        Accent     = Color3.fromRGB(30, 33, 50),
+        Text       = Color3.fromRGB(240, 240, 255),
+        Highlight  = Color3.fromRGB(105, 90, 205), -- Primary
+        Hover      = Color3.fromRGB(125, 110, 225),
+        Border     = Color3.fromRGB(55, 60, 85),
+        Shadow     = Color3.fromRGB(5, 7, 15),
+        Glow       = Color3.fromRGB(145, 130, 255),
+        Success    = Color3.fromRGB(80, 220, 140),
+        Danger     = Color3.fromRGB(255, 80, 100),
+    },
+    -- الثيم الأزرق الأصلي كمرجع
+    Blue = {
+        Background = Color3.fromRGB(10, 15, 25),
+        Accent = Color3.fromRGB(20, 30, 50),
+        Text = Color3.fromRGB(200, 220, 255),
+        Highlight = Color3.fromRGB(70, 130, 255),
+        Hover = Color3.fromRGB(100, 150, 255),
+        Border = Color3.fromRGB(50, 70, 100),
+        Shadow = Color3.fromRGB(0, 5, 15),
+        Glow = Color3.fromRGB(100, 150, 255),
+        Success = Color3.fromRGB(100, 200, 150),
+        Danger = Color3.fromRGB(255, 100, 120),
+    },
+}
+getgenv().CurrentTheme = getgenv().Themes.Dark
+getgenv().ThemeUpdatables = getgenv().ThemeUpdatables or {}
+getgenv().ExtraThemeFunctions = getgenv().ExtraThemeFunctions or {}
+
+-- --------------------------------------------------
+-- 🪟 GUI Setup (بنية الواجهة الجديدة)
+-- --------------------------------------------------
 
 local FelixzUI = {}
-local UserInputService = game:GetService("UserInputService")
-local TweenService = game:GetService("TweenService")
-local Debris = game:GetService("Debris")
-local CoreGui = game:GetService("CoreGui")
+FelixzUI.Version = "2.1"
+FelixzUI.Author = "Felixz (Completed by Grok)"
+local GUI_NAME = "FelixzHub"
+local playerGui = player:FindFirstChildOfClass("PlayerGui") or player:WaitForChild("PlayerGui")
+local gui, window, container, titleBar -- متغيرات لتخزين عناصر الواجهة الرئيسية
 
--- 🎨 الثيم الافتراضي وتخزين متغيرات الثيم العالمية
-getgenv().CurrentTheme = {
-    Accent = Color3.fromRGB(35, 35, 45),
-    Hover = Color3.fromRGB(60, 60, 80),
-    Highlight = Color3.fromRGB(100, 120, 255),
-    Text = Color3.fromRGB(235, 235, 245),
-    Background = Color3.fromRGB(20, 20, 24),
-    Border = Color3.fromRGB(70, 70, 85),
-    Shadow = Color3.fromRGB(6, 6, 10),
-    Glow = Color3.fromRGB(0, 200, 255)
-}
-getgenv().ThemeUpdatables = {} -- لتخزين دوال تحديث العناصر (الكروت، الأزرار، إلخ)
-getgenv().ExtraThemeFunctions = {} -- لتخزين دوال التحديث الإضافية (مثل makePage)
+-- ====== 🧹 حذف أي نسخ قديمة من الواجهة ======
+local function removeOldGUIs()
+    local oldInCore = game.CoreGui:FindFirstChild(GUI_NAME)
+    if oldInCore then oldInCore:Destroy() end
+    local oldInPlayer = playerGui:FindFirstChild(GUI_NAME)
+    if oldInPlayer then oldInPlayer:Destroy() end
+    for _, gui in ipairs(game.CoreGui:GetChildren()) do
+        if gui.Name == "FelixzHubNotifications" then gui:Destroy() end
+    end
+    for _, gui in ipairs(playerGui:GetChildren()) do
+        if gui.Name == "FelixzHubNotifications" then gui:Destroy() end
+    end
+end
+pcall(removeOldGUIs)
 
-local window, sidebar, content, activeTab, currentPage, buttons, pages, uiScale
-buttons = {}
-pages = {}
-local tabs = {} -- تخزين بيانات الألسنة
+-- 🔄 انتظار بسيط للتأكد أن النسخ القديمة حُذفت تماماً
+repeat
+    task.wait(0.1)
+until not game.CoreGui:FindFirstChild(GUI_NAME)
+    and not playerGui:FindFirstChild(GUI_NAME)
 
--- 🎨 دالة جلب الثيم
-local function getTheme()
-    return getgenv().CurrentTheme
+task.wait(0.5)
+
+-- ==========================================
+-- 🪟 إنشاء GUI جديد (الـ ScreenGui)
+-- ==========================================
+gui = Instance.new("ScreenGui")
+gui.Name = GUI_NAME
+gui.ResetOnSpawn = false
+gui.IgnoreGuiInset = true
+gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+gui.DisplayOrder = 9999
+
+local uiScale = Instance.new("UIScale", gui)
+uiScale.Name = "UIScale"
+
+local ok, err = pcall(function()
+    gui.Parent = CoreGui
+end)
+if not ok then
+    warn("⚠️ لم يمكن وضع FelixzHub في CoreGui: " .. tostring(err))
+    gui.Parent = playerGui
 end
 
--- 📏 دالة تحديث حجم CanvasSize للـ ScrollingFrames
-local function refreshScrollFrames()
-    local scale = uiScale and uiScale.Scale or 1
-    for _, frame in pairs(window:GetDescendants()) do
-        if frame:IsA("ScrollingFrame") then
-            -- نستخدم AutomaticCanvasSize.Y عادةً، لكن هذه وظيفة تحديث شاملة
-            if frame.AutomaticCanvasSize ~= Enum.AutomaticSize.Y then
-                local layout = frame:FindFirstChildOfClass("UIListLayout") or frame:FindFirstChildOfClass("UIGridLayout")
-                if layout then
-                    local contentY = layout.AbsoluteContentSize.Y * (1 / scale)
-                    -- نستخدم math.max لضمان عدم وجود مساحة فارغة سلبية
-                    frame.CanvasSize = UDim2.new(0, 0, 0, math.max(contentY + 20, 0)) 
+-- 📱 تحديد نوع الجهاز + تطبيق المقياس
+local function getDeviceType(returnEmoji)
+    if GuiService:IsTenFootInterface() then
+        return "Console", "🎮"
+    elseif UserInputService.TouchEnabled then
+        local cam = workspace.CurrentCamera
+        local screenSize = cam and cam.ViewportSize or Vector2.new(1920, 1080)
+        if screenSize.X >= 1000 or screenSize.Y >= 700 then
+            return "Tablet", "📲"
+        else
+            return "Mobile", "📱"
+        end
+    else
+        return "PC", "💻"
+    end
+end
+
+local function applyScaleByDevice()
+    local device = getDeviceType()
+    local scaleByDevice = {
+        PC = 0.95,
+        Tablet = 0.85,
+        Mobile = 0.7,
+        Console = 1.0
+    }
+    uiScale.Scale = scaleByDevice[device] or 0.9
+end
+
+applyScaleByDevice()
+workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(applyScaleByDevice)
+
+-- --------------------------------------------------
+-- 📨 Notification System (تم تحديثه ليتطابق مع الكود الجديد)
+-- --------------------------------------------------
+
+local notifGui = Instance.new("ScreenGui")
+notifGui.Name = "FelixzHubNotifications"
+notifGui.ResetOnSpawn = false
+notifGui.IgnoreGuiInset = true
+notifGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+local ok, err = pcall(function()
+	notifGui.Parent = CoreGui
+end)
+if not ok then
+	notifGui.Parent = playerGui
+end
+
+local notifHolder = Instance.new("Frame")
+notifHolder.Name = "NotificationHolder"
+notifHolder.Size = UDim2.new(0, 320, 1, -20)
+notifHolder.Position = UDim2.new(1, -340, 0, 20)
+notifHolder.BackgroundTransparency = 1
+notifHolder.BorderSizePixel = 0
+notifHolder.ZIndex = 1000
+notifHolder.Parent = notifGui
+
+local list = Instance.new("UIListLayout")
+list.SortOrder = Enum.SortOrder.LayoutOrder
+list.Padding = UDim.new(0, 8)
+list.VerticalAlignment = Enum.VerticalAlignment.Top
+list.Parent = notifHolder
+
+getgenv().notifGui = notifGui
+getgenv().notifHolder = notifHolder
+
+function FelixzUI:Notify(Title, Text, Duration, Icon, ColorType)
+    local theme = getgenv().CurrentTheme
+    local iconImage = Icon or "rbxassetid://4483345998" -- Default gear
+    local iconColor = theme.Highlight
+    local bgTransparency = 0
+    Duration = Duration or 3
+
+    -- If using ColorType for quick status
+    if ColorType == "Success" then iconColor = theme.Success
+    elseif ColorType == "Danger" then iconColor = theme.Danger
+    elseif ColorType == "Primary" then iconColor = theme.Highlight end
+
+    local Frame = Instance.new("Frame")
+    Frame.Size = UDim2.new(0, 290, 0, 65)
+    Frame.BackgroundColor3 = theme.Accent
+    Frame.BackgroundTransparency = 1
+    Frame.BorderSizePixel = 0
+    Frame.LayoutOrder = tick()
+    Frame.ZIndex = 100
+    Instance.new("UICorner", Frame).CornerRadius = UDim.new(0, 10)
+    Frame.Parent = notifHolder
+
+    local IconLabel = Instance.new("ImageLabel", Frame)
+    IconLabel.Size = UDim2.new(0, 45, 0, 45)
+    IconLabel.Position = UDim2.new(0, 10, 0.5, -22)
+    IconLabel.BackgroundTransparency = 1
+    IconLabel.Image = iconImage
+    IconLabel.ImageColor3 = iconColor
+    IconLabel.ImageTransparency = 1
+    Instance.new("UICorner", IconLabel).CornerRadius = UDim.new(0, 8)
+
+    local TitleLabel = Instance.new("TextLabel", Frame)
+    TitleLabel.Text = Title
+    TitleLabel.Font = Enum.Font.GothamBold
+    TitleLabel.TextSize = 15
+    TitleLabel.TextColor3 = theme.Text
+    TitleLabel.BackgroundTransparency = 1
+    TitleLabel.Position = UDim2.new(0, 65, 0, 8)
+    TitleLabel.Size = UDim2.new(1, -70, 0, 20)
+    TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    TitleLabel.TextTransparency = 1
+
+    local TextLabel = Instance.new("TextLabel", Frame)
+    TextLabel.Text = Text
+    TextLabel.Font = Enum.Font.Gotham
+    TextLabel.TextSize = 13
+    TextLabel.TextColor3 = theme.Highlight
+    TextLabel.BackgroundTransparency = 1
+    TextLabel.Position = UDim2.new(0, 65, 0, 32)
+    TextLabel.Size = UDim2.new(1, -70, 0, 25)
+    TextLabel.TextWrapped = true
+    TextLabel.TextXAlignment = Enum.TextXAlignment.Left
+    TextLabel.TextTransparency = 1
+
+    -- ✨ دخول ناعم
+    TweenService:Create(Frame, TweenInfo.new(0.3), {BackgroundTransparency = bgTransparency}):Play()
+    TweenService:Create(IconLabel, TweenInfo.new(0.3), {ImageTransparency = 0}):Play()
+    TweenService:Create(TitleLabel, TweenInfo.new(0.3), {TextTransparency = 0}):Play()
+    TweenService:Create(TextLabel, TweenInfo.new(0.3), {TextTransparency = 0}):Play()
+
+    -- ⏳ خروج بعد انتهاء المدة
+    task.delay(Duration, function()
+        if Frame and Frame.Parent then
+            TweenService:Create(Frame, TweenInfo.new(0.3), {BackgroundTransparency = 1}):Play()
+            TweenService:Create(IconLabel, TweenInfo.new(0.3), {ImageTransparency = 1}):Play()
+            TweenService:Create(TitleLabel, TweenInfo.new(0.3), {TextTransparency = 1}):Play()
+            TweenService:Create(TextLabel, TweenInfo.new(0.3), {TextTransparency = 1}):Play()
+            task.wait(0.35)
+            Frame:Destroy()
+        end
+    end)
+end
+getgenv().showNotification = FelixzUI.Notify -- ربط الدالة بالاسم الجديد لاستخدامه داخلياً في الكود المُرسل
+
+-- --------------------------------------------------
+-- 🧠 Main Functions
+-- --------------------------------------------------
+
+function FelixzUI:CreateWindow(Config)
+    Config = Config or {}
+    Config.Name = Config.Name or "Felixz Hub"
+    Config.KeySystem = Config.KeySystem or false
+    Config.Key = Config.Key or "FELIXZ-BETA-2025"
+
+    local Window = {}
+    Window.Tabs = {}
+    Window.KeyVerified = not Config.KeySystem
+
+    -- ⚠️ هنا سيتم وضع Key System القديم إذا كان مفعلاً
+    if Config.KeySystem and not isfile("felixz_key.txt") then
+        -- (هنا نضع الكود القديم لنظام المفتاح من مكتبتك الأصلية)
+        -- نُفترض أنك لا تريد تغيير تصميم نظام المفتاح الآن، لذا نستخدمه كما هو مع تحديث الألوان للثيم الجديد
+        local KeyGui = Instance.new("ScreenGui")
+        KeyGui.Name = "FelixzKeySystem"
+        KeyGui.Parent = CoreGui
+
+        local Frame = Instance.new("Frame", KeyGui)
+        Frame.Size = UDim2.new(0, 420, 0, 240)
+        Frame.Position = UDim2.new(0.5, -210, 0.5, -120)
+        Frame.BackgroundColor3 = getgenv().CurrentTheme.Accent
+        Frame.BorderSizePixel = 0
+        Instance.new("UICorner", Frame).CornerRadius = UDim.new(0, 16)
+
+        local Glow = Instance.new("ImageLabel", Frame)
+        Glow.Size = UDim2.new(1, 60, 1, 60)
+        Glow.Position = UDim2.new(0.5, -30, 0.5, -30)
+        Glow.AnchorPoint = Vector2.new(0.5, 0.5)
+        Glow.BackgroundTransparency = 1
+        Glow.Image = "rbxassetid://4996891970"
+        Glow.ImageColor3 = getgenv().CurrentTheme.Glow
+        Glow.ImageTransparency = 0.6
+        Glow.ZIndex = 0
+
+        local Title = Instance.new("TextLabel", Frame)
+        Title.Text = Config.Name .. " – Key System"
+        Title.Font = Enum.Font.GothamBold
+        Title.TextSize = 24
+        Title.TextColor3 = getgenv().CurrentTheme.Text
+        Title.BackgroundTransparency = 1
+        Title.Size = UDim2.new(1, 0, 0, 50)
+        Title.Position = UDim2.new(0, 0, 0, 20)
+
+        local Input = Instance.new("TextBox", Frame)
+        Input.PlaceholderText = "Enter your key..."
+        Input.Size = UDim2.new(0, 360, 0, 50)
+        Input.Position = UDim2.new(0.5, -180, 0.5, -25)
+        Input.BackgroundColor3 = getgenv().CurrentTheme.Border
+        Input.TextColor3 = getgenv().CurrentTheme.Text
+        Input.Font = Enum.Font.Gotham
+        Input.TextSize = 18
+        Instance.new("UICorner", Input).CornerRadius = UDim.new(0, 12)
+
+        local Submit = Instance.new("TextButton", Frame)
+        Submit.Text = "Verify"
+        Submit.Size = UDim2.new(0, 360, 0, 50)
+        Submit.Position = UDim2.new(0.5, -180, 1, -80)
+        Submit.BackgroundColor3 = getgenv().CurrentTheme.Highlight
+        Submit.TextColor3 = Color3.new(1,1,1)
+        Submit.Font = Enum.Font.GothamBold
+        Submit.TextSize = 18
+        Instance.new("UICorner", Submit).CornerRadius = UDim.new(0, 12)
+
+        Submit.MouseEnter:Connect(function()
+            TweenService:Create(Submit, TweenInfo.new(0.2), {BackgroundColor3 = getgenv().CurrentTheme.Hover}):Play()
+        end)
+        Submit.MouseLeave:Connect(function()
+            TweenService:Create(Submit, TweenInfo.new(0.2), {BackgroundColor3 = getgenv().CurrentTheme.Highlight}):Play()
+        end)
+
+        Submit.MouseButton1Click:Connect(function()
+            if Input.Text == Config.Key then
+                writefile("felixz_key.txt", "verified")
+                KeyGui:Destroy()
+                Window.KeyVerified = true
+                FelixzUI:Notify("Success", "Key accepted! Welcome to Felixz Hub! 🌟", 4, "rbxassetid://6031075938", "Success")
+                Window:Init()
+            else
+                FelixzUI:Notify("Error", "Invalid key! Try again.", 4, "rbxassetid://6035048640", "Danger")
+                Input.Text = ""
+            end
+        end)
+
+        Input.FocusLost:Connect(function()
+            if Input.Text == Config.Key then Submit.MouseButton1Click:Fire() end
+        end)
+
+        return Window
+    end
+
+    if isfile("felixz_key.txt") then
+        Window.KeyVerified = true
+        FelixzUI:Notify("Welcome Back", "Key verified automatically! 😊", 2)
+    end
+
+    -- Create Main Window
+    function Window:Init()
+        -- 🌟 Fancy Loading Screen
+        local loadingFrame = Instance.new("Frame")
+        loadingFrame.Name = "LoadingFrame"
+        loadingFrame.Size = UDim2.new(0, 420, 0, 140)
+        loadingFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+        loadingFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+        loadingFrame.BackgroundColor3 = getgenv().CurrentTheme.Background
+        loadingFrame.BackgroundTransparency = 1
+        loadingFrame.BorderSizePixel = 0
+        loadingFrame.ClipsDescendants = true
+        loadingFrame.Parent = gui
+        Instance.new("UICorner", loadingFrame).CornerRadius = UDim.new(0, 16)
+
+        local shadow = Instance.new("ImageLabel", loadingFrame)
+        shadow.AnchorPoint = Vector2.new(0.5, 0.5)
+        shadow.Position = loadingFrame.Position
+        shadow.Size = UDim2.new(1, 40, 1, 40)
+        shadow.BackgroundTransparency = 1
+        shadow.Image = "rbxassetid://1316045217"
+        shadow.ImageColor3 = getgenv().CurrentTheme.Shadow
+        shadow.ImageTransparency = 1
+        shadow.ScaleType = Enum.ScaleType.Slice
+        shadow.SliceCenter = Rect.new(10, 10, 118, 118)
+        shadow.ZIndex = loadingFrame.ZIndex - 1
+        shadow.Parent = loadingFrame
+
+        local bgGrad = Instance.new("UIGradient", loadingFrame)
+        bgGrad.Color = ColorSequence.new {
+            ColorSequenceKeypoint.new(0, getgenv().CurrentTheme.Highlight),
+            ColorSequenceKeypoint.new(1, getgenv().CurrentTheme.Background)
+        }
+        bgGrad.Rotation = 45
+
+        local label = Instance.new("TextLabel", loadingFrame)
+        label.Size = UDim2.new(1, -40, 0, 30)
+        label.Position = UDim2.new(0.5, 0, 0.25, 0)
+        label.AnchorPoint = Vector2.new(0.5, 0)
+        label.BackgroundTransparency = 1
+        label.Text = "جار التحميل... 0%"
+        label.TextColor3 = getgenv().CurrentTheme.Text
+        label.Font = Enum.Font.GothamBold
+        label.TextScaled = true
+        label.ZIndex = 2
+
+        local glowText = Instance.new("UIStroke", label)
+        glowText.Color = getgenv().CurrentTheme.Glow
+        glowText.Thickness = 1.2
+        glowText.Transparency = 0.5
+
+        local barBg = Instance.new("Frame", loadingFrame)
+        barBg.Size = UDim2.new(1, -40, 0, 20)
+        barBg.Position = UDim2.new(0.5, 0, 0.65, 0)
+        barBg.AnchorPoint = Vector2.new(0.5, 0)
+        barBg.BackgroundColor3 = getgenv().CurrentTheme.Accent
+        barBg.BorderSizePixel = 0
+        Instance.new("UICorner", barBg).CornerRadius = UDim.new(0, 10)
+
+        local bar = Instance.new("Frame", barBg)
+        bar.Size = UDim2.new(0, 0, 1, 0)
+        bar.BackgroundColor3 = getgenv().CurrentTheme.Highlight
+        bar.BackgroundTransparency = 0.1
+        Instance.new("UICorner", bar).CornerRadius = UDim.new(0, 10)
+
+        local barStroke = Instance.new("UIStroke", bar)
+        barStroke.Color = getgenv().CurrentTheme.Text
+        barStroke.Transparency = 0.85
+        barStroke.Thickness = 1
+
+        local shimmer = Instance.new("UIGradient", bar)
+        shimmer.Color = ColorSequence.new {
+            ColorSequenceKeypoint.new(0, getgenv().CurrentTheme.Highlight),
+            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 255, 255)),
+            ColorSequenceKeypoint.new(1, getgenv().CurrentTheme.Highlight)
+        }
+        shimmer.Rotation = 0
+        getgenv().FelixzLoops["ShimmerAnim"] = task.spawn(function()
+            while shimmer.Parent do
+                for i = -1, 1, 0.05 do
+                    shimmer.Offset = Vector2.new(i, 0)
+                    task.wait(0.05)
                 end
             end
-        end
-    end
-end
+        end)
 
--- 🔔 دالة الإشعارات (Notify)
-function FelixzUI:Notify(Title, Text, Duration, Icon, ColorType)
-    -- لا يوجد كود الإشعارات هنا، لكن تم التأكد من أنك تملك دالة إشعارات خارجية تعمل.
-    -- هذا مجرد Placeholder للاستخدام الخارجي.
-    print(string.format("[Notify] %s: %s", Title, Text))
-end
-
--- 🔄 دالة تحديث الثيم الرئيسية
-local function updateTheme()
-    local theme = getTheme()
-    if not theme or not window then return end
-
-    -- تحديث أزرار التبويبات
-    for name, btn in pairs(buttons or {}) do
-        if btn then
-            btn.TextColor3 = theme.Text
-            btn.BackgroundColor3 = (btn == activeTab) and theme.Highlight or theme.Accent
-            local stroke = btn:FindFirstChildOfClass("UIStroke")
-            if stroke then stroke.Color = theme.Border end
-            local arrow = btn:FindFirstChild("Arrow")
-            if arrow then
-                arrow.TextColor3 = theme.Text
-                arrow.Visible = (btn == activeTab)
-            end
-            local glow = btn:FindFirstChild("Glow")
-            if glow and glow:IsA("ImageLabel") then glow.ImageColor3 = theme.Glow end
-        end
-    end
-
-    -- تحديث الحاويات الرئيسية
-    if content then content.BackgroundColor3 = theme.Background end
-    if sidebar then 
-        sidebar.BackgroundColor3 = theme.Accent
-        local stroke = sidebar:FindFirstChildOfClass("UIStroke")
-        if stroke then stroke.Color = theme.Border end
-    end
-    local titleBar = window:FindFirstChild("TitleBar") or window:FindFirstChild("titleBar")
-    if titleBar then 
-        titleBar.BackgroundColor3 = theme.Accent
-        local stroke = titleBar:FindFirstChildOfClass("UIStroke")
-        if stroke then stroke.Color = theme.Border end
-    end
-    local shadow = window:FindFirstChild("Shadow") or window:FindFirstChild("WindowShadow")
-    if shadow and shadow:IsA("ImageLabel") then shadow.ImageColor3 = theme.Shadow end
-
-    -- استدعاء تحديثات العناصر الفرعية (الكروت، الأزرار، التوجلات)
-    if getgenv().ExtraThemeFunctions then
-        for _, fn in ipairs(getgenv().ExtraThemeFunctions) do pcall(fn) end
-    end
-
-    if getgenv().ThemeUpdatables then
-        for _, fn in ipairs(getgenv().ThemeUpdatables) do pcall(fn, theme) end
-    end
-    
-    -- تحديث صفحات المحتوى
-    for _, p in pairs(pages) do
-        p.BackgroundColor3 = theme.Background
-    end
-end
-FelixzUI.UpdateTheme = updateTheme
-
--- ====== makePage (لإنشاء Tab Content) ======
-local function makePage(name)
-    local theme = getTheme()
-    local p = Instance.new("Frame")
-    p.Name = name .. "Page"
-    p.Size = UDim2.fromScale(1, 1)
-    p.BackgroundColor3 = theme.Background
-    p.BorderSizePixel = 0
-    p.Visible = false
-    p.Parent = content
-    Instance.new("UICorner", p).CornerRadius = UDim.new(0, 12)
-
-    -- 🟢 ScrollFrame محسّن
-    local scroll = Instance.new("ScrollingFrame")
-    scroll.Name = "ContentScroll"
-    scroll.Size = UDim2.new(1, -10, 1, -10)
-    scroll.Position = UDim2.new(0, 5, 0, 5)
-    scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
-    scroll.ScrollBarThickness = 6
-    scroll.BackgroundTransparency = 0.4
-    scroll.BackgroundColor3 = theme.Background
-    scroll.ScrollBarImageColor3 = theme.Glow or theme.Highlight -- لون الشريط
-    scroll.ScrollingDirection = Enum.ScrollingDirection.Y
-    scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
-    scroll.Parent = p
-
-    -- 🧩 Padding
-    local padding = Instance.new("UIPadding", scroll)
-    padding.PaddingLeft = UDim.new(0, 8)
-    padding.PaddingRight = UDim.new(0, 8)
-    padding.PaddingTop = UDim.new(0, 8)
-    padding.PaddingBottom = UDim.new(0, 8)
-
-    -- 🧱 Layout منظم
-    local layout = Instance.new("UIListLayout", scroll)
-    layout.Padding = UDim.new(0, 8)
-    layout.SortOrder = Enum.SortOrder.LayoutOrder
-    layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-
-    -- 🔄 إدراج دالة تحديث الثيم الخاصة به
-    table.insert(getgenv().ExtraThemeFunctions, function()
-        local t = getTheme()
-        if scroll then
-            scroll.ScrollBarImageColor3 = t.Glow or t.Highlight
-            scroll.BackgroundColor3 = t.Background
-        end
-        p.BackgroundColor3 = t.Background
-    end)
-    
-    task.defer(refreshScrollFrames) -- تحديث أولي
-
-    return p, scroll
-end
-
--- ====== makeTabButton (لإنشاء أزرار الألسنة) ======
-local function makeTabButton(name, icon, order)
-    local theme = getTheme()
-
-    local btn = Instance.new("TextButton")
-    btn.Name = name .. "Button"
-    btn.LayoutOrder = order
-    btn.Size = UDim2.new(1, -10, 0, 40)
-    btn.Position = UDim2.new(0.5, 0, 0, 0)
-    btn.AnchorPoint = Vector2.new(0.5, 0)
-    btn.Text = name
-    btn.Font = Enum.Font.GothamBold
-    btn.TextSize = 14
-    btn.TextColor3 = theme.Text
-    btn.BackgroundColor3 = theme.Accent
-    btn.AutoButtonColor = false
-    btn.BorderSizePixel = 0
-    btn.Parent = sidebar
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
-
-    -- Icon
-    if icon then
-        local img = Instance.new("ImageLabel")
-        img.Size = UDim2.new(0, 24, 0, 24)
-        img.Position = UDim2.new(0, 8, 0.5, 0)
-        img.AnchorPoint = Vector2.new(0, 0.5)
-        img.Image = icon
-        img.ImageColor3 = theme.Text
-        img.BackgroundTransparency = 1
-        img.Parent = btn
-        
-        -- تعديل حجم النص لوجود أيقونة
-        btn.TextXAlignment = Enum.TextXAlignment.Left
-        btn.TextLabel:SetAttribute("TextOffset", UDim2.new(0, 36, 0, 0)) -- لا يعمل مباشرة هكذا، يتطلب تعديل النص
-        -- حل بديل: استخدم TextLabel منفصل أو أزِح النص يدوياً
-        btn.TextLabel:TweenPosition(UDim2.new(0, 36, 0, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.1, true)
-    end
-    
-    -- Arrow Indicator
-    local arrow = Instance.new("TextLabel")
-    arrow.Name = "Arrow"
-    arrow.Size = UDim2.new(0, 10, 1, 0)
-    arrow.Position = UDim2.new(1, -10, 0, 0)
-    arrow.Text = "»"
-    arrow.Font = Enum.Font.Code
-    arrow.TextSize = 24
-    arrow.TextColor3 = theme.Text
-    arrow.BackgroundTransparency = 1
-    arrow.Visible = false
-    arrow.Parent = btn
-
-    local function setActive()
-        if activeTab == btn then return end
-
-        -- إخفاء القديم
-        if activeTab then
-            TweenService:Create(activeTab, TweenInfo.new(0.25), {
-                BackgroundColor3 = theme.Accent
-            }):Play()
-            if currentPage then currentPage.Visible = false end
-            local oldArrow = activeTab:FindFirstChild("Arrow")
-            if oldArrow then oldArrow.Visible = false end
-        end
-
-        -- إظهار الجديد
-        activeTab = btn
-        currentPage = pages[name]
-        currentPage.Visible = true
-
-        TweenService:Create(btn, TweenInfo.new(0.25), {
-            BackgroundColor3 = theme.Highlight
+        -- ✨ دخول أنيميشن
+        TweenService:Create(loadingFrame, TweenInfo.new(0.8, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+            BackgroundTransparency = 0,
+            Size = UDim2.new(0, 420, 0, 140),
+            Position = UDim2.new(0.5, 0, 0.5, 0)
         }):Play()
-        
-        arrow.Visible = true
-        
-        refreshScrollFrames() -- تحديث حجم المحتوى
+        TweenService:Create(shadow, TweenInfo.new(0.8, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            ImageTransparency = 0.6
+        }):Play()
 
-        -- إزالة حالة الـ Hover من الزر القديم
-        local oldHover = activeTab.BackgroundColor3:Lerp(theme.Hover, 0) -- trick to force update
-    end
-
-    btn.MouseButton1Click:Connect(setActive)
-    
-    -- Hover effect
-    btn.MouseEnter:Connect(function()
-        if activeTab ~= btn then
-            TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = theme.Hover}):Play()
-        end
-    end)
-    btn.MouseLeave:Connect(function()
-        if activeTab ~= btn then
-            TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = theme.Accent}):Play()
-        end
-    end)
-    
-    return btn
-end
-
--- 🟥 makeCard (لإنشاء مقطع داخل التبويب)
-function makeCard(scroll, titleText)
-    local theme = getTheme()
-
-    local card = Instance.new("Frame")
-    card.Size = UDim2.new(1, 0, 0, 0) -- التعديل: Size بالـ Scale 1
-    card.AutomaticSize = Enum.AutomaticSize.Y
-    card.BackgroundColor3 = theme.Accent
-    card.BorderSizePixel = 0
-    card.BackgroundTransparency = 0.08
-    card.ClipsDescendants = true
-    card.Parent = scroll
-    Instance.new("UICorner", card).CornerRadius = UDim.new(0, 12)
-
-    -- 🔹 الظل
-    local shadow = Instance.new("ImageLabel")
-    shadow.Name = "CardShadow"
-    shadow.AnchorPoint = Vector2.new(0.5, 0.5)
-    shadow.Position = UDim2.fromScale(0.5, 0.5)
-    shadow.Size = UDim2.new(1, 22, 1, 22)
-    shadow.BackgroundTransparency = 1
-    shadow.Image = "rbxassetid://1316045217"
-    shadow.ImageColor3 = theme.Shadow
-    shadow.ImageTransparency = 0.82
-    shadow.ScaleType = Enum.ScaleType.Slice
-    shadow.SliceCenter = Rect.new(10, 10, 118, 118)
-    shadow.ZIndex = 0
-    shadow.Parent = card
-
-    -- 🔹 الإطار
-    local stroke = Instance.new("UIStroke")
-    stroke.Parent = card
-    stroke.Color = theme.Border
-    stroke.Thickness = 1
-    stroke.Transparency = 0.45
-
-    -- 🔹 تدرج داخلي
-    local gradient = Instance.new("UIGradient")
-    gradient.Parent = card
-    gradient.Rotation = 45
-    gradient.Color = ColorSequence.new{
-        ColorSequenceKeypoint.new(0, theme.Accent),
-        ColorSequenceKeypoint.new(1, theme.Background)
-    }
-
-    -- 🔁 حركة التدرج
-    local gradientLoop = task.spawn(function()
-        while card and card.Parent do
-            for i = 0, 1, 0.02 do
-                if gradient and gradient.Parent then
-                    gradient.Offset = Vector2.new(i, i)
-                else break end
-                task.wait(0.06)
-            end
-        end
-    end)
-
-    -- 🔹 العنوان
-    local title = Instance.new("TextLabel")
-    title.Name = "CardTitle"
-    title.Text = titleText or "Section"
-    title.Font = Enum.Font.GothamBold
-    title.TextSize = 16
-    title.TextColor3 = theme.Text
-    title.BackgroundTransparency = 1
-    title.Size = UDim2.new(1, -20, 0, 28)
-    title.Position = UDim2.new(0, 12, 0, 8)
-    title.TextXAlignment = Enum.TextXAlignment.Left
-    title.Parent = card
-
-    -- 🔹 الخط السفلي (افتراضياً 50 بكسل)
-    local underline = Instance.new("Frame")
-    underline.Name = "CardUnderline"
-    underline.Size = UDim2.new(0, 50, 0, 2)
-    underline.Position = UDim2.new(0, 12, 0, 38)
-    underline.BackgroundColor3 = theme.Highlight
-    underline.BorderSizePixel = 0
-    underline.Parent = card
-
-    -- 🔹 الفاصل
-    local divider = Instance.new("Frame")
-    divider.Name = "CardDivider"
-    divider.Size = UDim2.new(1, -24, 0, 1)
-    divider.Position = UDim2.new(0, 12, 0, 40)
-    divider.BackgroundColor3 = theme.Border
-    divider.BackgroundTransparency = 0.45
-    divider.BorderSizePixel = 0
-    divider.Parent = card
-
-    -- 🔹 محتوى العناصر
-    local items = Instance.new("Frame")
-    items.Name = "CardItems"
-    items.Size = UDim2.new(1, -24, 0, 0)
-    items.Position = UDim2.new(0, 12, 0, 50)
-    items.BackgroundTransparency = 1
-    items.AutomaticSize = Enum.AutomaticSize.Y
-    items.Parent = card
-
-    local ilayout = Instance.new("UIListLayout")
-    ilayout.Padding = UDim.new(0, 8)
-    ilayout.SortOrder = Enum.SortOrder.LayoutOrder
-    ilayout.Parent = items
-
-    -- ✨ دخول أنيميشن
-    card.BackgroundTransparency = 1
-    TweenService:Create(card, TweenInfo.new(0.45, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-        BackgroundTransparency = 0.08
-    }):Play()
-
-    -- 🔹 Hover effect
-    card.MouseEnter:Connect(function()
-        local th = getTheme()
-        TweenService:Create(card, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {BackgroundColor3 = th.Hover}):Play()
-        -- توسيع الخط السفلي
-        TweenService:Create(underline, TweenInfo.new(0.25, Enum.EasingStyle.Back), {Size = UDim2.new(1, -24, 0, 2)}):Play()
-        TweenService:Create(shadow, TweenInfo.new(0.2), {ImageTransparency = 0.7}):Play()
-    end)
-
-    card.MouseLeave:Connect(function()
-        local th = getTheme()
-        TweenService:Create(card, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {BackgroundColor3 = th.Accent}):Play()
-        -- تصغير الخط السفلي
-        TweenService:Create(underline, TweenInfo.new(0.25, Enum.EasingStyle.Quad), {Size = UDim2.new(0, 50, 0, 2)}):Play()
-        TweenService:Create(shadow, TweenInfo.new(0.2), {ImageTransparency = 0.82}):Play()
-    end)
-
-    -- ✨ مؤثرات المثلثات المضيئة
-    local particleFrame = Instance.new("Frame")
-    particleFrame.Size = UDim2.fromScale(1, 1)
-    particleFrame.BackgroundTransparency = 1
-    particleFrame.ClipsDescendants = true
-    particleFrame.ZIndex = 0
-    particleFrame.Parent = card
-
-    local particleLoop = task.spawn(function()
-        while particleFrame and particleFrame.Parent do
-            local th = getTheme()
-            local tri = Instance.new("ImageLabel")
-            local size = math.random(25, 40)
-            tri.Size = UDim2.fromOffset(size, size)
-            tri.Position = UDim2.new(math.random(), 0, math.random(), 0)
-            tri.BackgroundTransparency = 1
-            tri.Image = "rbxassetid://6031091004" -- أيقونة مثلث
-            tri.ImageColor3 = th.Glow
-            tri.ImageTransparency = 0.6
-            tri.Rotation = math.random(0, 360)
-            tri.ZIndex = 0
-            tri.Parent = particleFrame
-
-            TweenService:Create(tri, TweenInfo.new(5, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {
-                Position = UDim2.new(tri.Position.X.Scale + math.random(-1, 1)/50, 0, tri.Position.Y.Scale - math.random(5, 10)/100, 0),
-                Rotation = tri.Rotation + math.random(-60, 60),
-                ImageTransparency = 1
+        -- تحميل تدريجي
+        local totalTime, steps = 3, 30
+        for i = 1, steps do
+            local progress = math.floor((i / steps) * 100)
+            label.Text = ("جار التحميل... %d%%"):format(progress)
+            TweenService:Create(bar, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                Size = UDim2.new(progress / 100, 0, 1, 0)
             }):Play()
-
-            Debris:AddItem(tri, 5.5)
-            task.wait(0.5)
+            task.wait(totalTime / steps)
         end
-    end)
 
-    -- 🔹 دالة تحديث الثيم
-    local function updateCardTheme()
-        local th = getTheme()
-        if not card or not card.Parent then return end
-        
-        card.BackgroundColor3 = th.Accent
-        title.TextColor3 = th.Text
-        divider.BackgroundColor3 = th.Border
-        underline.BackgroundColor3 = th.Highlight
-        shadow.ImageColor3 = th.Shadow
-        stroke.Color = th.Border
-        
-        gradient.Color = ColorSequence.new{
-            ColorSequenceKeypoint.new(0, th.Accent),
-            ColorSequenceKeypoint.new(1, th.Background)
+        local ding = Instance.new("Sound", loadingFrame)
+        ding.SoundId = "rbxassetid://232127604"
+        ding.Volume = 2
+        pcall(function() ding:Play() end)
+
+        local greetings = {
+            "منور يا %s 🌹",
+            "أهلاً وسهلاً فيك يا %s 👋",
+            "رجعت لنا يا %s 😎",
+            "كيف حالك يا %s؟ 🌟",
+            "نورت المكان يا %s ✨",
+            "يوم جميل يا %s 🌞",
+            "ياهلا بـ %s 🙌",
+            "رجعت الأسطورة %s 🔥"
         }
-        
-        for _, tri in ipairs(particleFrame:GetChildren()) do
-            if tri:IsA("ImageLabel") then tri.ImageColor3 = th.Glow end
-        end
-    end
 
-    table.insert(getgenv().ThemeUpdatables, updateCardTheme)
+        local randomMsg = greetings[math.random(1, #greetings)]
+        label.Text = randomMsg:format(player.Name)
 
-    -- 🧹 تنظيف عند التدمير
-    card.Destroying:Connect(function()
-        if gradientLoop then task.cancel(gradientLoop) end
-        if particleLoop then task.cancel(particleLoop) end
-        -- إزالة دالة التحديث
-        local updatables = getgenv().ThemeUpdatables
-        for i, func in ipairs(updatables) do
-            if func == updateCardTheme then
-                table.remove(updatables, i)
-                break
-            end
-        end
-    end)
-
-    return card, items
-end
-
--- 🟢 makeToggle (زر التبديل)
-local function makeToggle(container, data)
-    local theme = getTheme()
-    local state = data.Default or false
-    
-    local item = Instance.new("Frame")
-    item.Size = UDim2.new(1, 0, 0, 30)
-    item.BackgroundTransparency = 1
-    item.Parent = container
-
-    -- 📝 العنوان
-    local title = Instance.new("TextLabel")
-    title.Text = data.Name or "Toggle"
-    title.TextSize = 14
-    title.Font = Enum.Font.GothamBold
-    title.TextColor3 = theme.Text
-    title.BackgroundTransparency = 1
-    title.Size = UDim2.new(1, -40, 1, 0)
-    title.TextXAlignment = Enum.TextXAlignment.Left
-    title.Parent = item
-
-    -- 🔘 زر التبديل (Button part)
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0, 48, 0, 24)
-    btn.Position = UDim2.new(1, 0, 0.5, 0)
-    btn.AnchorPoint = Vector2.new(1, 0.5)
-    btn.BackgroundColor3 = state and theme.Highlight or theme.Accent
-    btn.BorderSizePixel = 0
-    btn.AutoButtonColor = false
-    btn.Text = ""
-    btn.Parent = item
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(1, 0)
-    
-    -- 🟠 مؤشر الحالة
-    local indicator = Instance.new("Frame")
-    local size = 20
-    indicator.Size = UDim2.fromOffset(size, size)
-    indicator.AnchorPoint = Vector2.new(0.5, 0.5)
-    indicator.BackgroundColor3 = theme.Text
-    indicator.BorderSizePixel = 0
-    indicator.Parent = btn
-    Instance.new("UICorner", indicator).CornerRadius = UDim.new(1, 0)
-
-    -- 🎨 دالة تحديث الحالة
-    local function updateState(newState)
-        state = newState
-        local targetColor = state and theme.Highlight or theme.Accent
-        local targetX = state and 1 or 0
-        
-        TweenService:Create(btn, TweenInfo.new(0.25, Enum.EasingStyle.Quad), {
-            BackgroundColor3 = targetColor
+        TweenService:Create(label, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+            TextSize = 28,
+            TextTransparency = 0
+        }):Play()
+        TweenService:Create(bar, TweenInfo.new(0.3), {
+            BackgroundColor3 = getgenv().CurrentTheme.Success
         }):Play()
 
-        TweenService:Create(indicator, TweenInfo.new(0.25, Enum.EasingStyle.Quad), {
-            Position = UDim2.new(targetX, state and -3 or 3, 0.5, 0)
-        }):Play()
-    end
-    
-    -- وضع المؤشر في المكان الصحيح عند الإنشاء
-    indicator.Position = UDim2.new(state and 1 or 0, state and -3 or 3, 0.5, 0)
+        task.wait(1.0)
 
-    -- 🖱️ التفاعل
-    btn.MouseButton1Click:Connect(function()
-        state = not state
-        updateState(state)
-        if data.Callback then
-            data.Callback(state)
-        end
-    end)
-    
-    -- 🔄 دالة تحديث الثيم
-    local function updateToggleTheme(th)
-        if not item or not item.Parent then return end
-        title.TextColor3 = th.Text
-        indicator.BackgroundColor3 = th.Text
-        if state then
-            btn.BackgroundColor3 = th.Highlight
-        else
-            btn.BackgroundColor3 = th.Accent
-        end
-    end
-    table.insert(getgenv().ThemeUpdatables, updateToggleTheme)
-
-    return item, updateState
-end
-
--- 🔘 makeButton (الزر العادي)
-local function makeButton(container, text, callback, sizeX)
-    local theme = getTheme()
-    sizeX = sizeX or 120
-
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0, sizeX, 0, 36)
-    btn.Text = text or "Button"
-    btn.Font = Enum.Font.GothamBold
-    btn.TextSize = 14
-    btn.TextColor3 = theme.Text
-    btn.BackgroundColor3 = theme.Accent
-    btn.AutoButtonColor = false
-    btn.BorderSizePixel = 0
-    btn.ClipsDescendants = true
-    btn.Parent = container
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
-
-    -- Stroke محسّن
-    local stroke = Instance.new("UIStroke", btn)
-    stroke.Color = theme.Highlight
-    stroke.Thickness = 1
-    stroke.Transparency = 0.5
-
-    local isHovering = false
-
-    -- Hover effect
-    btn.MouseEnter:Connect(function()
-        isHovering = true
-        local th = getTheme()
-        TweenService:Create(btn, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-            BackgroundColor3 = th.Hover,
-            Size = UDim2.new(0, sizeX + 6, 0, 38)
-        }):Play()
-        TweenService:Create(stroke, TweenInfo.new(0.25), {
-            Transparency = 0.2,
-            Thickness = 1.2
-        }):Play()
-    end)
-
-    btn.MouseLeave:Connect(function()
-        isHovering = false
-        local th = getTheme()
-        TweenService:Create(btn, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-            BackgroundColor3 = th.Accent,
-            Size = UDim2.new(0, sizeX, 0, 36)
-        }):Play()
-        TweenService:Create(stroke, TweenInfo.new(0.25), {
-            Transparency = 0.5,
-            Thickness = 1
-        }):Play()
-    end)
-
-    -- تأثير الضغط الواقعي
-    btn.MouseButton1Down:Connect(function()
-        local th = getTheme()
-        TweenService:Create(btn, TweenInfo.new(0.1), {
-            BackgroundColor3 = th.Highlight,
-            Size = UDim2.new(0, sizeX + 2, 0, 34),
-            Position = UDim2.new(0, 1, 0, 1)
-        }):Play()
-        TweenService:Create(stroke, TweenInfo.new(0.1), {
-            Transparency = 0.8
-        }):Play()
-    end)
-
-    btn.MouseButton1Up:Connect(function()
-        local th = getTheme()
-        local targetSize = isHovering and UDim2.new(0, sizeX + 6, 0, 38) or UDim2.new(0, sizeX, 0, 36)
-        local targetColor = isHovering and th.Hover or th.Accent
-        local targetStrokeTrans = isHovering and 0.2 or 0.5
-
-        TweenService:Create(btn, TweenInfo.new(0.15), {
-            BackgroundColor3 = targetColor,
-            Size = targetSize,
-            Position = UDim2.new(0, 0, 0, 0)
-        }):Play()
-        TweenService:Create(stroke, TweenInfo.new(0.15), {
-            Transparency = targetStrokeTrans
-        }):Play()
-    end)
-
-    -- صوت ونقرة ووميض
-    btn.MouseButton1Click:Connect(function(x, y)
-        if callback then callback() end
-        -- Ripple Effect (كما هو في كودك)
-        local ripple = Instance.new("Frame")
-        ripple.Name = "ActiveRipple"
-        ripple.AnchorPoint = Vector2.new(0.5, 0.5)
-        ripple.Position = UDim2.new(0, x - btn.AbsolutePosition.X, 0, y - btn.AbsolutePosition.Y)
-        ripple.Size = UDim2.fromOffset(0, 0)
-        ripple.BackgroundColor3 = theme.Highlight
-        ripple.BackgroundTransparency = 0.5
-        ripple.ZIndex = btn.ZIndex + 5
-        ripple.ClipsDescendants = true
-        ripple.Parent = btn
-        Instance.new("UICorner", ripple).CornerRadius = UDim.new(1, 0)
-        local finalSize = math.max(btn.AbsoluteSize.X, btn.AbsoluteSize.Y) * 2.2
-        local tweenIn = TweenService:Create(ripple, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-            Size = UDim2.new(0, finalSize, 0, finalSize),
-            BackgroundTransparency = 0.7
-        })
-        local tweenOut = TweenService:Create(ripple, TweenInfo.new(0.4, Enum.EasingStyle.Sine, Enum.EasingDirection.In), {
+        -- خروج شاشة التحميل
+        TweenService:Create(loadingFrame, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
+            Position = UDim2.new(0.5, 0, -0.2, 0),
             BackgroundTransparency = 1
+        }):Play()
+        TweenService:Create(shadow, TweenInfo.new(0.4), { ImageTransparency = 1 }):Play()
+
+        task.wait(0.6)
+        pcall(function() loadingFrame:Destroy() end)
+
+        -- --------------------------------------------------
+        -- 🪟 Main Window (النافذة الرئيسية بتصميم النيون)
+        -- --------------------------------------------------
+
+        window = Instance.new("Frame")
+        window.Name = "MainWindow"
+        window.AnchorPoint = Vector2.new(0.5, 0.5)
+        window.Position = UDim2.new(0.5, 0, 0.5, 0)
+        window.Size = UDim2.new(0, 560, 0, 420)
+        window.BackgroundColor3 = getgenv().CurrentTheme.Background
+        window.BackgroundTransparency = 0.15
+        window.BorderSizePixel = 0
+        window.ClipsDescendants = true
+        window.ZIndex = 5
+        Instance.new("UICorner", window).CornerRadius = UDim.new(0, 18)
+        window.Parent = gui
+
+        local wStroke = Instance.new("UIStroke", window)
+        wStroke.Thickness = 3.2
+        wStroke.Transparency = 0.05
+        wStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+        wStroke.Color = getgenv().CurrentTheme.Highlight
+
+        local gradient = Instance.new("UIGradient", wStroke)
+        gradient.Rotation = 0
+        gradient.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0.00, getgenv().CurrentTheme.Highlight),
+            ColorSequenceKeypoint.new(0.25, Color3.fromRGB(255, 255, 255)),
+            ColorSequenceKeypoint.new(0.50, getgenv().CurrentTheme.Highlight),
+            ColorSequenceKeypoint.new(0.75, getgenv().CurrentTheme.Highlight),
+            ColorSequenceKeypoint.new(1.00, getgenv().CurrentTheme.Highlight)
         })
-        tweenIn:Play()
-        tweenIn.Completed:Connect(function() tweenOut:Play() end)
-        tweenOut.Completed:Connect(function() ripple:Destroy() end)
-    end)
 
-    -- أنيميشن دخول خفيف
-    task.spawn(function()
-        btn.BackgroundTransparency = 1
-        btn.TextTransparency = 1
-        stroke.Transparency = 1
+        local glowWindow = Instance.new("ImageLabel", window)
+        glowWindow.Name = "NeonGlow"
+        glowWindow.Size = UDim2.new(1, 70, 1, 70)
+        glowWindow.Position = UDim2.new(0.5, 0, 0.5, 0)
+        glowWindow.AnchorPoint = Vector2.new(0.5, 0.5)
+        glowWindow.BackgroundTransparency = 1
+        glowWindow.Image = "rbxassetid://4996891970"
+        glowWindow.ImageColor3 = getgenv().CurrentTheme.Highlight
+        glowWindow.ImageTransparency = 0.6
+        glowWindow.ZIndex = 4
 
-        TweenService:Create(btn, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { BackgroundTransparency = 0 }):Play()
-        TweenService:Create(btn, TweenInfo.new(0.3), { TextTransparency = 0 }):Play()
-        TweenService:Create(stroke, TweenInfo.new(0.5), { Transparency = 0.5 }):Play()
-    end)
-    
-    -- تحديث فوري للثيم
-    local function updateButtonTheme(th)
-        if not btn or not btn.Parent then return end
-        btn.BackgroundColor3 = isHovering and th.Hover or th.Accent
-        btn.TextColor3 = th.Text
-        stroke.Color = th.Highlight
-    end
-    table.insert(getgenv().ThemeUpdatables, updateButtonTheme)
+        local function updateWindowNeonColor()
+            local t = getgenv().CurrentTheme
+            wStroke.Color = t.Highlight
+            glowWindow.ImageColor3 = t.Highlight
+            gradient.Color = ColorSequence.new({
+                ColorSequenceKeypoint.new(0.00, t.Highlight),
+                ColorSequenceKeypoint.new(0.25, Color3.fromRGB(255, 255, 255)),
+                ColorSequenceKeypoint.new(0.50, t.Highlight),
+                ColorSequenceKeypoint.new(0.75, t.Highlight),
+                ColorSequenceKeypoint.new(1.00, t.Highlight)
+            })
+            window.BackgroundColor3 = t.Background
+        end
+        updateWindowNeonColor()
+        table.insert(getgenv().ExtraThemeFunctions, updateWindowNeonColor)
 
-    return btn
-end
+        getgenv().FelixzLoops["NeonGlowAnim"] = task.spawn(function()
+            while window.Parent do
+                gradient.Rotation = (gradient.Rotation + 2) % 360
+                task.wait(0.03)
+            end
+        end)
+
+        -- --------------------------------------------------
+        -- 📌 Draggable Logic (منطق السحب)
+        -- --------------------------------------------------
+        local dragging, dragStart, startPos
+        window.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 and not minimized then
+                dragging = true
+                dragStart = input.Position
+                startPos = window.Position
+                input.Changed:Connect(function()
+                    if input.UserInputState == Enum.UserInputState.End then dragging = false end
+                end)
+            end
+        end)
+        getgenv().FelixzConnections["DragInputChanged"] = UserInputService.InputChanged:Connect(function(input)
+            if dragging and input.UserInputType == Enum.UserInputType.MouseMovement and not minimized then
+                local delta = input.Position - dragStart
+                window.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+            end
+        end)
 
 
--- ==========================================================
--- 🔨 الدوال الهيكلية للمستخدم (API)
--- ==========================================================
+        -- --------------------------------------------------
+        -- 📊 Title Bar (شريط العنوان الجديد)
+        -- --------------------------------------------------
+        titleBar = Instance.new("Frame")
+        titleBar.Size = UDim2.new(1,0,0,38)
+        titleBar.BackgroundColor3 = getgenv().CurrentTheme.Accent
+        titleBar.BorderSizePixel = 0
+        titleBar.ZIndex = 50
+        titleBar.ClipsDescendants = true
+        local titleCorner = Instance.new("UICorner", titleBar)
+        titleCorner.CornerRadius = UDim.new(0,18, 0, 0) -- Top corners only (Adjusted to match your corner radius)
+        titleBar.Parent = window
 
-function FelixzUI:CreateWindow(config)
-    -- ... (كود إنشاء GUI الرئيسية (ScreenGui) والـ Shadow والـ TitleBar) ...
-    -- نفترض أنك قمت بإنشاء العناصر الأساسية: gui, window, sidebar, content
-    
-    local gui = Instance.new("ScreenGui")
-    gui.Name = config.Name or "FelixzUI"
-    gui.ResetOnSpawn = false
-    gui.IgnoreGuiInset = true
-    gui.Parent = CoreGui
-    
-    -- العناصر الرئيسية
-    window = Instance.new("Frame", gui)
-    window.Name = "Window"
-    window.Size = UDim2.new(0, 600, 0, 400)
-    window.Position = UDim2.fromScale(0.5, 0.5)
-    window.AnchorPoint = Vector2.new(0.5, 0.5)
-    window.BackgroundColor3 = getTheme().Background
-    Instance.new("UICorner", window).CornerRadius = UDim.new(0, 15)
-    
-    -- Sidebar (للألسنة)
-    sidebar = Instance.new("Frame", window)
-    sidebar.Name = "Sidebar"
-    sidebar.Size = UDim2.new(0.3, 0, 1, 0)
-    sidebar.BackgroundColor3 = getTheme().Accent
-    local sidebarLayout = Instance.new("UIListLayout", sidebar)
-    sidebarLayout.Padding = UDim.new(0, 5)
-    sidebarLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-    sidebarLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    
-    -- Content (للمحتوى الرئيسي)
-    content = Instance.new("Frame", window)
-    content.Name = "Content"
-    content.Size = UDim2.new(0.7, 0, 1, 0)
-    content.Position = UDim2.new(0.3, 0, 0, 0)
-    content.BackgroundColor3 = getTheme().Background
+        local titleContainer = Instance.new("Frame", titleBar)
+        titleContainer.Size = UDim2.new(1, -80, 1, 0)
+        titleContainer.Position = UDim2.new(0, 14, 0, 0)
+        titleContainer.BackgroundTransparency = 1
+        titleContainer.ZIndex = 51
 
-    -- UIScale (لمزامنة حجم الخطوط)
-    uiScale = Instance.new("UIScale", gui)
-    uiScale.Scale = 1 
-    
-    -- ربط تحديثات الـ ScrollFrames
-    window:GetPropertyChangedSignal("AbsoluteSize"):Connect(refreshScrollFrames)
-    uiScale:GetPropertyChangedSignal("Scale"):Connect(refreshScrollFrames)
-    
-    -- 🔑 KeySystem
-    if config.KeySystem and config.Key then
-        window.Visible = false
-        -- ... (هنا يتم تنفيذ كود نظام المفتاح) ...
-    end
-    
-    local self = {}
-    
-    function self:CreateTab(data)
-        table.insert(tabs, data)
-        local b = makeTabButton(data.Name, data.Icon, #tabs)
-        local p, scroll = makePage(data.Name)
-        buttons[data.Name] = b
-        pages[data.Name] = p
-        
-        -- تفعيل أول تبويب بشكل افتراضي
-        if #tabs == 1 then
-            activeTab = b
-            currentPage = p
-            p.Visible = true
-            b.BackgroundColor3 = getTheme().Highlight
-            local arrow = b:FindFirstChild("Arrow")
-            if arrow then arrow.Visible = true end
+        local title = Instance.new("TextLabel", titleContainer)
+        title.Text = Config.Name
+        title.Font = Enum.Font.GothamBold
+        title.TextSize = 16
+        title.TextColor3 = getgenv().CurrentTheme.Text
+        title.BackgroundTransparency = 1
+        title.Size = UDim2.new(0, 100, 1, 0)
+        title.TextXAlignment = Enum.TextXAlignment.Left
+
+        local pingLabel = Instance.new("TextLabel", titleContainer)
+        pingLabel.Text = "PING: 0ms"
+        pingLabel.Font = Enum.Font.GothamBold
+        pingLabel.TextSize = 14
+        pingLabel.TextColor3 = getgenv().CurrentTheme.Text
+        pingLabel.BackgroundTransparency = 1
+        pingLabel.Size = UDim2.new(0, 100, 1, 0)
+        pingLabel.Position = UDim2.new(0, 110, 0, 0)
+        pingLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+        local fpsLabel = Instance.new("TextLabel", titleContainer)
+        fpsLabel.Text = "FPS: 0"
+        fpsLabel.Font = Enum.Font.GothamBold
+        fpsLabel.TextSize = 14
+        fpsLabel.TextColor3 = getgenv().CurrentTheme.Text
+        fpsLabel.BackgroundTransparency = 1
+        fpsLabel.Size = UDim2.new(0, 80, 1, 0)
+        fpsLabel.Position = UDim2.new(0, 210, 0, 0)
+        fpsLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+        local deviceLabel = Instance.new("TextLabel", titleContainer)
+        local device, emoji = getDeviceType(true)
+        deviceLabel.Text = "Device: " .. device .. " " .. emoji
+        deviceLabel.Font = Enum.Font.GothamBold
+        deviceLabel.TextSize = 14
+        deviceLabel.TextColor3 = getgenv().CurrentTheme.Text
+        deviceLabel.BackgroundTransparency = 1
+        deviceLabel.Size = UDim2.new(0, 150, 1, 0)
+        deviceLabel.Position = UDim2.new(0, 300, 0, 0)
+        deviceLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+        local lastUpdate = tick()
+        local frameCounter = 0
+        getgenv().FelixzConnections["FPS_PING_Update"] = RunService.RenderStepped:Connect(function()
+            frameCounter += 1
+            local now = tick()
+
+            if now - lastUpdate >= 0.25 then
+                local fps = math.floor(frameCounter / (now - lastUpdate))
+                frameCounter = 0
+                lastUpdate = now
+
+                local fpsColor = (fps >= 100 and Color3.fromRGB(0, 255, 0)) or (fps >= 60 and Color3.fromRGB(255, 220, 0)) or Color3.fromRGB(255, 80, 80)
+                fpsLabel.TextColor3 = fpsColor
+                fpsLabel.Text = "FPS: " .. tostring(fps)
+            end
+
+            local ok, val = pcall(function() return Stats.Network.ServerStatsItem["Data Ping"]:GetValue() end)
+            if ok and val then
+                local ping = math.floor(val)
+                local pingColor = (ping <= 60 and Color3.fromRGB(0, 255, 0)) or (ping <= 130 and Color3.fromRGB(255, 220, 0)) or Color3.fromRGB(255, 80, 80)
+                pingLabel.TextColor3 = pingColor
+                pingLabel.Text = "PING: " .. ping .. "ms"
+            end
+        end)
+
+        -- --------------------------------------------------
+        -- ❌ Min/Close Buttons (الأزرار العلوية)
+        -- --------------------------------------------------
+
+        local function makeTopBtn(txt, isClose)
+            local theme = getgenv().CurrentTheme
+            local b = Instance.new("TextButton")
+            b.Text = txt
+            b.Font = Enum.Font.GothamBold
+            b.TextSize = 16
+            b.TextColor3 = theme.Text
+            b.AutoButtonColor = false
+            b.Size = UDim2.fromOffset(32, 24)
+            b.BackgroundColor3 = theme.Accent
+            b.BorderSizePixel = 0
+            b.ZIndex = 1000
+            b.Parent = titleBar
+            Instance.new("UICorner", b).CornerRadius = UDim.new(0, 6)
+
+            local uiStroke = Instance.new("UIStroke", b)
+            uiStroke.Color = theme.Highlight
+            uiStroke.Thickness = 1
+            uiStroke.Transparency = 0.4
+
+            b.MouseEnter:Connect(function()
+                local t = getgenv().CurrentTheme
+                TweenService:Create(b, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {
+                    Size = UDim2.fromOffset(36, 26),
+                    BackgroundColor3 = isClose and Color3.fromRGB(200, 60, 60) or t.Hover,
+                    TextColor3 = Color3.fromRGB(255, 255, 255)
+                }):Play()
+            end)
+
+            b.MouseLeave:Connect(function()
+                local t = getgenv().CurrentTheme
+                TweenService:Create(b, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {
+                    Size = UDim2.fromOffset(32, 24),
+                    BackgroundColor3 = t.Accent,
+                    TextColor3 = t.Text
+                }):Play()
+            end)
+
+            return b
         end
 
-        local tabAPI = {}
-        
-        function tabAPI:CreateSection(sectionData)
-            local card, items = makeCard(scroll, sectionData.Name)
-            local sectionAPI = {}
-            
-            function sectionAPI:Toggle(toggleData)
-                makeToggle(items, toggleData)
-                refreshScrollFrames()
+        local closeBtn = makeTopBtn("X", true)
+        closeBtn.AnchorPoint = Vector2.new(1, 0)
+        closeBtn.Position = UDim2.new(1, -6, 0.5, -12)
+
+        local minBtn = makeTopBtn("—", false)
+        minBtn.AnchorPoint = Vector2.new(1, 0)
+        minBtn.Position = UDim2.new(1, -46, 0.5, -12)
+
+        local minimized = false
+
+        -- 🧩 منطق الإغلاق والتصغير (تم دمج منطقك الجديد)
+        local isConfirmationOpen = false
+
+        local function closeGUIWithAnimation()
+            local theme = getgenv().CurrentTheme
+            local tweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+
+            -- إيقاف التوغلات
+            if getgenv().AllToggles then
+                for toggleName, toggleState in pairs(getgenv().AllToggles) do
+                    if toggleState == true then
+                        local setter = getgenv().ToggleSetters and getgenv().ToggleSetters[toggleName]
+                        if setter then setter(false, true) end
+                    end
+                end
             end
-            
-            function sectionAPI:Button(buttonData)
-                makeButton(items, buttonData.Name, buttonData.Callback, buttonData.SizeX or 120)
-                refreshScrollFrames()
+            -- إيقاف الـ loops
+            if getgenv().FelixzLoops then
+                for name, thread in pairs(getgenv().FelixzLoops) do
+                    pcall(function() task.cancel(thread) end)
+                end
             end
-            
-            -- يمكن إضافة المزيد من العناصر هنا (Slider, Dropdown, etc.)
-            
-            return sectionAPI
+
+            -- أنيميشن الإغلاق
+            if window and window.Parent then
+                local centerTween = TweenService:Create(window, TweenInfo.new(0.25, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), { Position = UDim2.new(0.5, 0, 0.5, 0) })
+                centerTween:Play()
+                centerTween.Completed:Wait()
+
+                TweenService:Create(window, tweenInfo, { BackgroundTransparency = 1, Size = UDim2.fromOffset(0, 0) }):Play()
+            end
+
+            task.wait(0.5)
+
+            -- التنظيف النهائي
+            pcall(function()
+                if getgenv().FelixzConnections then
+                    for _, conn in pairs(getgenv().FelixzConnections) do if typeof(conn) == "RBXScriptConnection" then pcall(function() conn:Disconnect() end) end end
+                    getgenv().FelixzConnections = nil
+                end
+                getgenv().ToggleSetters = nil
+                getgenv().AllToggles = nil
+                getgenv().FelixzLoops = nil
+            end)
+
+            if gui and gui.Parent then gui:Destroy() end
         end
-        
-        return tabAPI
+
+        local function showConfirmation()
+            if isConfirmationOpen then return end
+            isConfirmationOpen = true
+            local theme = getgenv().CurrentTheme
+
+            window.Active = false
+            window.Selectable = false
+
+            local confirmFrame = Instance.new("Frame")
+            confirmFrame.Size = UDim2.fromOffset(0, 0)
+            confirmFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+            confirmFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+            confirmFrame.BackgroundColor3 = theme.Accent
+            confirmFrame.BorderSizePixel = 0
+            confirmFrame.ZIndex = 10000
+            confirmFrame.ClipsDescendants = true
+            confirmFrame.Parent = gui
+            Instance.new("UICorner", confirmFrame).CornerRadius = UDim.new(0, 16)
+
+            local stroke = Instance.new("UIStroke", confirmFrame)
+            stroke.Color = theme.Highlight
+            stroke.Thickness = 1.5
+            stroke.Transparency = 0.3
+
+            -- ✨ أنيميشن الدخول
+            TweenService:Create(confirmFrame, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+                Size = UDim2.fromOffset(300, 150)
+            }):Play()
+            task.wait(0.5)
+
+            local titleConfirm = Instance.new("TextLabel", confirmFrame)
+            titleConfirm.Text = "تأكيد الإغلاق"
+            titleConfirm.Font = Enum.Font.GothamBold
+            titleConfirm.TextSize = 20
+            titleConfirm.TextColor3 = theme.Text
+            titleConfirm.BackgroundTransparency = 1
+            titleConfirm.Size = UDim2.new(1, 0, 0, 40)
+            titleConfirm.Position = UDim2.new(0, 0, 0, 10)
+
+            local msgConfirm = Instance.new("TextLabel", confirmFrame)
+            msgConfirm.Text = "هل أنت متأكد من إغلاق القائمة؟ سيتم إيقاف جميع التوغلات."
+            msgConfirm.Font = Enum.Font.Gotham
+            msgConfirm.TextSize = 13
+            msgConfirm.TextColor3 = theme.Text
+            msgConfirm.BackgroundTransparency = 1
+            msgConfirm.Size = UDim2.new(1, -20, 0, 40)
+            msgConfirm.Position = UDim2.new(0, 10, 0, 45)
+            msgConfirm.TextWrapped = true
+
+            local close = Instance.new("TextButton", confirmFrame)
+            close.Text = "إغلاق"
+            close.Size = UDim2.fromOffset(100, 30)
+            close.Position = UDim2.new(1, -110, 1, -40)
+            close.BackgroundColor3 = theme.Danger
+            close.TextColor3 = Color3.new(1, 1, 1)
+            Instance.new("UICorner", close).CornerRadius = UDim.new(0, 6)
+
+            local cancel = Instance.new("TextButton", confirmFrame)
+            cancel.Text = "إلغاء"
+            cancel.Size = UDim2.fromOffset(100, 30)
+            cancel.Position = UDim2.new(1, -215, 1, -40)
+            cancel.BackgroundColor3 = theme.Highlight
+            cancel.TextColor3 = Color3.new(1, 1, 1)
+            Instance.new("UICorner", cancel).CornerRadius = UDim.new(0, 6)
+
+            local function hideConfirmation()
+                TweenService:Create(confirmFrame, TweenInfo.new(0.3, Enum.EasingStyle.Sine, Enum.EasingDirection.In), {
+                    Size = UDim2.fromOffset(0, 0),
+                    BackgroundTransparency = 1
+                }):Play()
+                task.wait(0.3)
+                confirmFrame:Destroy()
+                isConfirmationOpen = false
+                window.Active = true
+                window.Selectable = true
+            end
+
+            close.MouseButton1Click:Connect(function()
+                closeGUIWithAnimation()
+                isConfirmationOpen = false
+            end)
+
+            cancel.MouseButton1Click:Connect(hideConfirmation)
+        end
+        closeBtn.MouseButton1Click:Connect(showConfirmation)
+
+
+        minBtn.MouseButton1Click:Connect(function()
+            minimized = not minimized
+            local targetSize = UDim2.new(0, 560, 0, 420)
+            local targetHeight = minimized and 38 or targetSize.Y.Offset
+
+            if minimized then
+                pcall(function() dragging = false end)
+                if container then container.Visible = false end
+            end
+
+            local t = TweenService:Create(window, TweenInfo.new(0.18, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {
+                Size = UDim2.fromOffset(window.AbsoluteSize.X, targetHeight)
+            })
+            t:Play()
+
+            t.Completed:Wait()
+
+            if not minimized and container then
+                container.Visible = true
+            end
+
+            minBtn.Text = minimized and "▢" or "—"
+        end)
+
+
+        -- --------------------------------------------------
+        -- 📑 Tabs and Content (حاوية الألسنة والمحتوى)
+        -- --------------------------------------------------
+
+        -- الحاوية الكبيرة للألسنة والمحتوى (باقي النافذة تحت شريط العنوان)
+        container = Instance.new("Frame", window)
+        container.Name = "MainContentContainer"
+        container.Size = UDim2.new(1, 0, 1, -38)
+        container.Position = UDim2.new(0, 0, 0, 38)
+        container.BackgroundTransparency = 1
+
+        local TabButtons = Instance.new("Frame", container)
+        TabButtons.Name = "TabButtons"
+        TabButtons.Size = UDim2.new(0, 150, 1, -20)
+        TabButtons.Position = UDim2.new(0, 10, 0, 10)
+        TabButtons.BackgroundTransparency = 1
+        local TabList = Instance.new("UIListLayout", TabButtons)
+        TabList.Padding = UDim.new(0, 8)
+        TabList.SortOrder = Enum.SortOrder.LayoutOrder
+
+        local TabContent = Instance.new("Frame", container)
+        TabContent.Name = "TabContent"
+        TabContent.Size = UDim2.new(1, -170, 1, -20)
+        TabContent.Position = UDim2.new(0, 160, 0, 10)
+        TabContent.BackgroundTransparency = 1
+        TabContent.ClipsDescendants = true
+
+        -- ✨ إظهار النافذة بعد أنيميشن شاشة التحميل
+        if Window.KeyVerified then
+            window.Visible = true
+            local targetSize = window.Size
+            window.Size = UDim2.new(0, 0, 0, 0)
+            window.AnchorPoint = Vector2.new(0.5, 0.5)
+            window.Position = UDim2.new(0.5, 0, 0.5, 0)
+
+            TweenService:Create(window, TweenInfo.new(0.9, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+                Size = targetSize
+            }):Play()
+
+            local flash = Instance.new("Frame")
+            flash.Size = UDim2.fromScale(1, 1)
+            flash.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+            flash.BackgroundTransparency = 0.2
+            flash.BorderSizePixel = 0
+            flash.ZIndex = 10
+            flash.Parent = window
+            TweenService:Create(flash, TweenInfo.new(0.8, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                BackgroundTransparency = 1
+            }):Play()
+
+            FelixzUI:Notify("📱 Device Detected", "تم اكتشاف جهازك: "..device.." "..emoji, 3, nil, "Primary")
+        end
+
+
+        -- Create Tab Function
+        function Window:CreateTab(TabConfig)
+            TabConfig = TabConfig or {}
+            TabConfig.Name = TabConfig.Name or "Tab"
+            TabConfig.Icon = TabConfig.Icon or "rbxassetid://4483345998"
+
+            local Tab = {}
+            Tab.Sections = {}
+            Tab.Active = false
+
+            local Button = Instance.new("TextButton")
+            Button.Name = TabConfig.Name
+            Button.Size = UDim2.new(1, 0, 0, 45)
+            Button.Position = UDim2.new(0, 0, 0, (#Window.Tabs * 50))
+            Button.BackgroundColor3 = getgenv().CurrentTheme.Accent
+            Button.BorderSizePixel = 0
+            Button.Text = ""
+            Button.AutoButtonColor = false
+            Button.LayoutOrder = #Window.Tabs
+            local BtnCorner = Instance.new("UICorner", Button)
+            BtnCorner.CornerRadius = UDim.new(0, 10)
+
+            local BtnStroke = Instance.new("UIStroke", Button)
+            BtnStroke.Color = getgenv().CurrentTheme.Highlight
+            BtnStroke.Thickness = 1
+            BtnStroke.Transparency = 0.5
+            Button.Parent = TabButtons
+            Tab.Button = Button
+            Tab.BtnStroke = BtnStroke
+
+            local Icon = Instance.new("ImageLabel", Button)
+            Icon.Size = UDim2.new(0, 24, 0, 24)
+            Icon.Position = UDim2.new(0, 10, 0.5, -12)
+            Icon.BackgroundTransparency = 1
+            Icon.Image = TabConfig.Icon
+            Icon.ImageColor3 = getgenv().CurrentTheme.Text
+
+            local Name = Instance.new("TextLabel", Button)
+            Name.Text = TabConfig.Name
+            Name.Font = Enum.Font.GothamSemibold
+            Name.TextSize = 14
+            Name.TextColor3 = getgenv().CurrentTheme.Text
+            Name.BackgroundTransparency = 1
+            Name.Size = UDim2.new(1, -50, 1, 0)
+            Name.Position = UDim2.new(0, 40, 0, 0)
+            Name.TextXAlignment = Enum.TextXAlignment.Left
+
+            -- Content Frame
+            local Content = Instance.new("ScrollingFrame")
+            Content.Name = "Content"
+            Content.Size = UDim2.fromScale(1, 1)
+            Content.Position = UDim2.new(0, 0, 0, 0)
+            Content.BackgroundTransparency = 1
+            Content.BorderSizePixel = 0
+            Content.ScrollBarThickness = 6
+            Content.ScrollBarImageColor3 = getgenv().CurrentTheme.Highlight
+            Content.Visible = false
+            Content.CanvasSize = UDim2.new(0, 0, 0, 0)
+            Content.Parent = TabContent
+            Tab.Content = Content
+
+            local ContentLayout = Instance.new("UIListLayout", Content)
+            ContentLayout.Padding = UDim.new(0, 10)
+            ContentLayout.SortOrder = Enum.SortOrder.LayoutOrder
+
+            -- Tab Switch
+            Button.MouseButton1Click:Connect(function()
+                for _, t in pairs(Window.Tabs) do
+                    t.Content.Visible = false
+                    TweenService:Create(t.Button, TweenInfo.new(0.2), {BackgroundColor3 = getgenv().CurrentTheme.Accent}):Play()
+                    TweenService:Create(t.BtnStroke, TweenInfo.new(0.2), {Transparency = 0.5}):Play()
+                    t.Active = false
+                end
+                Content.Visible = true
+                TweenService:Create(Button, TweenInfo.new(0.2), {BackgroundColor3 = getgenv().CurrentTheme.Highlight}):Play()
+                TweenService:Create(BtnStroke, TweenInfo.new(0.2), {Transparency = 0}):Play()
+                Tab.Active = true
+                FelixzUI:Notify("Tab Switched", "Opened " .. TabConfig.Name, 1, nil, "Primary")
+            end)
+
+            -- Auto-activate first tab
+            if #Window.Tabs == 0 then
+                Content.Visible = true
+                Button.BackgroundColor3 = getgenv().CurrentTheme.Highlight
+                BtnStroke.Transparency = 0
+                Tab.Active = true
+            end
+
+            table.insert(Window.Tabs, Tab)
+
+            ContentLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+                Content.CanvasSize = UDim2.new(0, 0, 0, ContentLayout.AbsoluteContentSize.Y + 20)
+            end)
+
+            -- Section Function
+            function Tab:CreateSection(SectionConfig)
+                SectionConfig = SectionConfig or {}
+                SectionConfig.Name = SectionConfig.Name or "Section"
+
+                local Section = {}
+
+                local Frame = Instance.new("Frame")
+                Frame.Name = SectionConfig.Name
+                Frame.Size = UDim2.new(1, 0, 0, 40)
+                Frame.BackgroundColor3 = getgenv().CurrentTheme.Accent
+                Frame.BackgroundTransparency = 0.3
+                Frame.BorderSizePixel = 0
+                local FrameCorner = Instance.new("UICorner", Frame)
+                FrameCorner.CornerRadius = UDim.new(0, 12)
+                local FrameStroke = Instance.new("UIStroke", Frame)
+                FrameStroke.Color = getgenv().CurrentTheme.Highlight
+                FrameStroke.Thickness = 1
+                FrameStroke.Transparency = 0.7
+                Frame.Parent = Content
+                Frame.LayoutOrder = #Tab.Sections + 1
+
+                local Title = Instance.new("TextLabel", Frame)
+                Title.Text = SectionConfig.Name
+                Title.Font = Enum.Font.GothamBold
+                Title.TextSize = 16
+                Title.TextColor3 = getgenv().CurrentTheme.Text
+                Title.BackgroundTransparency = 1
+                Title.Size = UDim2.new(1, 0, 0, 35)
+                Title.Position = UDim2.new(0, 15, 0, 5)
+                Title.TextXAlignment = Enum.TextXAlignment.Left
+
+                local Container = Instance.new("Frame", Frame)
+                Container.Name = "Container"
+                Container.Size = UDim2.new(1, -20, 1, -40)
+                Container.Position = UDim2.new(0, 10, 0, 40)
+                Container.BackgroundTransparency = 1
+                Container.Parent = Frame
+                local Layout = Instance.new("UIListLayout", Container)
+                Layout.SortOrder = Enum.SortOrder.LayoutOrder
+                Layout.Padding = UDim.new(0, 8)
+                Layout.FillDirection = Enum.FillDirection.Vertical
+
+                Layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+                    Frame.Size = UDim2.new(1, 0, 0, Layout.AbsoluteContentSize.Y + 50)
+                end)
+
+                -- Toggle Element (No change in logic, only colors/theme access)
+                function Section:Toggle(ToggleConfig)
+                    ToggleConfig = ToggleConfig or {}
+                    ToggleConfig.Name = ToggleConfig.Name or "Toggle"
+                    ToggleConfig.Default = ToggleConfig.Default or false
+                    ToggleConfig.Callback = ToggleConfig.Callback or function() end
+
+                    local Toggle = {}
+                    local Value = ToggleConfig.Default
+                    getgenv().AllToggles[ToggleConfig.Name] = Value
+
+                    local Row = Instance.new("Frame")
+                    Row.Size = UDim2.new(1, 0, 0, 35)
+                    Row.BackgroundTransparency = 1
+                    Row.Parent = Container
+
+                    local Label = Instance.new("TextLabel", Row)
+                    Label.Text = ToggleConfig.Name
+                    Label.Font = Enum.Font.Gotham
+                    Label.TextSize = 14
+                    Label.TextColor3 = getgenv().CurrentTheme.Text
+                    Label.BackgroundTransparency = 1
+                    Label.Size = UDim2.new(1, -60, 1, 0)
+                    Label.TextXAlignment = Enum.TextXAlignment.Left
+
+                    local ToggleFrame = Instance.new("Frame", Row)
+                    ToggleFrame.Size = UDim2.new(0, 40, 0, 20)
+                    ToggleFrame.Position = UDim2.new(1, -50, 0.5, -10)
+                    ToggleFrame.BackgroundColor3 = Value and getgenv().CurrentTheme.Success or getgenv().CurrentTheme.Danger
+                    ToggleFrame.BorderSizePixel = 0
+                    local ToggleCorner = Instance.new("UICorner", ToggleFrame)
+                    ToggleCorner.CornerRadius = UDim.new(0, 10)
+
+                    local Knob = Instance.new("Frame", ToggleFrame)
+                    Knob.Size = UDim2.new(0, 16, 0, 16)
+                    Knob.Position = Value and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 2, 0.5, -8)
+                    Knob.BackgroundColor3 = Color3.new(1,1,1)
+                    Knob.BorderSizePixel = 0
+                    local KnobCorner = Instance.new("UICorner", Knob)
+                    KnobCorner.CornerRadius = UDim.new(0, 8)
+
+                    local ClickBtn = Instance.new("TextButton", ToggleFrame)
+                    ClickBtn.Size = UDim2.new(1, 0, 1, 0)
+                    ClickBtn.BackgroundTransparency = 1
+                    ClickBtn.Text = ""
+
+                    local function toggle(newValue, isInternal)
+                        Value = newValue
+                        getgenv().AllToggles[ToggleConfig.Name] = Value
+                        TweenService:Create(ToggleFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {
+                            BackgroundColor3 = Value and getgenv().CurrentTheme.Success or getgenv().CurrentTheme.Danger
+                        }):Play()
+                        TweenService:Create(Knob, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {
+                            Position = Value and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 2, 0.5, -8)
+                        }):Play()
+                        if not isInternal then
+                            ToggleConfig.Callback(Value)
+                            FelixzUI:Notify(ToggleConfig.Name, Value and "Enabled" or "Disabled", 1, nil, Value and "Success" or "Danger")
+                        end
+                    end
+
+                    ClickBtn.MouseButton1Click:Connect(function()
+                        toggle(not Value, false)
+                    end)
+
+                    ClickBtn.MouseEnter:Connect(function()
+                        TweenService:Create(ToggleFrame, TweenInfo.new(0.1), {Size = UDim2.new(0, 42, 0, 22)}):Play()
+                    end)
+                    ClickBtn.MouseLeave:Connect(function()
+                        TweenService:Create(ToggleFrame, TweenInfo.new(0.1), {Size = UDim2.new(0, 40, 0, 20)}):Play()
+                    end)
+
+                    function Toggle:Set(newValue, isInternal)
+                        toggle(newValue, isInternal)
+                    end
+
+                    function Toggle:Get()
+                        return Value
+                    end
+
+                    getgenv().ToggleSetters[ToggleConfig.Name] = toggle
+
+                    return Toggle
+                end
+
+                -- Slider Element
+                function Section:Slider(SliderConfig)
+                    SliderConfig = SliderConfig or {}
+                    SliderConfig.Name = SliderConfig.Name or "Slider"
+                    SliderConfig.Min = SliderConfig.Min or 0
+                    SliderConfig.Max = SliderConfig.Max or 100
+                    SliderConfig.Default = SliderConfig.Default or 50
+                    SliderConfig.Callback = SliderConfig.Callback or function() end
+
+                    local Slider = {}
+                    local Value = SliderConfig.Default
+                    local Row = Instance.new("Frame")
+                    Row.Size = UDim2.new(1, 0, 0, 50)
+                    Row.BackgroundTransparency = 1
+                    Row.Parent = Container
+
+                    local Label = Instance.new("TextLabel", Row)
+                    Label.Text = SliderConfig.Name
+                    Label.Font = Enum.Font.Gotham
+                    Label.TextSize = 14
+                    Label.TextColor3 = getgenv().CurrentTheme.Text
+                    Label.BackgroundTransparency = 1
+                    Label.Size = UDim2.new(1, -60, 0, 20)
+                    Label.Position = UDim2.new(0, 0, 0, 5)
+
+                    local ValueLabel = Instance.new("TextLabel", Row)
+                    ValueLabel.Text = tostring(Value)
+                    ValueLabel.Font = Enum.Font.GothamBold
+                    ValueLabel.TextSize = 14
+                    ValueLabel.TextColor3 = getgenv().CurrentTheme.Highlight
+                    ValueLabel.BackgroundTransparency = 1
+                    ValueLabel.Size = UDim2.new(0, 50, 0, 20)
+                    ValueLabel.Position = UDim2.new(1, -60, 0, 5)
+                    ValueLabel.TextXAlignment = Enum.TextXAlignment.Right
+
+                    local SliderFrame = Instance.new("Frame", Row)
+                    SliderFrame.Size = UDim2.new(1, 0, 0, 8)
+                    SliderFrame.Position = UDim2.new(0, 0, 0, 30)
+                    SliderFrame.BackgroundColor3 = getgenv().CurrentTheme.Accent
+                    SliderFrame.BorderSizePixel = 0
+                    local SliderCorner = Instance.new("UICorner", SliderFrame)
+                    SliderCorner.CornerRadius = UDim.new(0, 4)
+
+                    local Percent = (Value - SliderConfig.Min) / (SliderConfig.Max - SliderConfig.Min)
+                    local Fill = Instance.new("Frame", SliderFrame)
+                    Fill.Size = UDim2.new(Percent, 0, 1, 0)
+                    Fill.BackgroundColor3 = getgenv().CurrentTheme.Highlight
+                    Fill.BorderSizePixel = 0
+                    local FillCorner = Instance.new("UICorner", Fill)
+                    FillCorner.CornerRadius = UDim.new(0, 4)
+
+                    local Thumb = Instance.new("Frame", SliderFrame)
+                    Thumb.Size = UDim2.new(0, 16, 0, 16)
+                    Thumb.Position = UDim2.new(Percent, -8, -0.5, -4)
+                    Thumb.BackgroundColor3 = Color3.new(1,1,1)
+                    Thumb.BorderSizePixel = 0
+                    local ThumbCorner = Instance.new("UICorner", Thumb)
+                    ThumbCorner.CornerRadius = UDim.new(0, 8)
+
+                    local SliderBtn = Instance.new("TextButton", SliderFrame)
+                    SliderBtn.Size = UDim2.new(1, 0, 1, 0)
+                    SliderBtn.BackgroundTransparency = 1
+                    SliderBtn.Text = ""
+
+                    local Dragging = false
+                    SliderBtn.MouseButton1Down:Connect(function()
+                        Dragging = true
+                    end)
+                    UserInputService.InputEnded:Connect(function(input)
+                        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                            Dragging = false
+                        end
+                    end)
+                    UserInputService.InputChanged:Connect(function(input)
+                        if Dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+                            local MouseX = input.Position.X
+                            local SliderAbsX = SliderFrame.AbsolutePosition.X
+                            local SliderWidth = SliderFrame.AbsoluteSize.X
+                            local NewPercent = math.clamp((MouseX - SliderAbsX) / SliderWidth, 0, 1)
+                            local NewValue = math.floor(SliderConfig.Min + (SliderConfig.Max - SliderConfig.Min) * NewPercent)
+                            Value = NewValue
+                            Fill.Size = UDim2.new(NewPercent, 0, 1, 0)
+                            Thumb.Position = UDim2.new(NewPercent, -8, -0.5, -4)
+                            ValueLabel.Text = tostring(NewValue)
+                            SliderConfig.Callback(NewValue)
+                        end
+                    end)
+
+                    function Slider:Set(newValue)
+                        newValue = math.clamp(newValue, SliderConfig.Min, SliderConfig.Max)
+                        Value = newValue
+                        local NewPercent = (newValue - SliderConfig.Min) / (SliderConfig.Max - SliderConfig.Min)
+                        Fill.Size = UDim2.new(NewPercent, 0, 1, 0)
+                        Thumb.Position = UDim2.new(NewPercent, -8, -0.5, -4)
+                        ValueLabel.Text = tostring(newValue)
+                        SliderConfig.Callback(newValue)
+                    end
+
+                    function Slider:Get()
+                        return Value
+                    end
+
+                    return Slider
+                end
+
+                -- Button Element
+                function Section:Button(ButtonConfig)
+                    ButtonConfig = ButtonConfig or {}
+                    ButtonConfig.Name = ButtonConfig.Name or "Button"
+                    ButtonConfig.Callback = ButtonConfig.Callback or function() end
+                    ButtonConfig.Icon = ButtonConfig.Icon or nil
+
+                    local Btn = Instance.new("TextButton")
+                    Btn.Size = UDim2.new(1, 0, 0, 40)
+                    Btn.BackgroundColor3 = getgenv().CurrentTheme.Highlight
+                    Btn.BorderSizePixel = 0
+                    Btn.Text = ButtonConfig.Name
+                    Btn.Font = Enum.Font.GothamBold
+                    Btn.TextSize = 14
+                    Btn.TextColor3 = Color3.new(1,1,1)
+                    Btn.AutoButtonColor = false
+                    local BtnCorner = Instance.new("UICorner", Btn)
+                    BtnCorner.CornerRadius = UDim.new(0, 8)
+                    Btn.Parent = Container
+
+                    if ButtonConfig.Icon then
+                        local Icn = Instance.new("ImageLabel", Btn)
+                        Icn.Size = UDim2.new(0, 20, 0, 20)
+                        Icn.Position = UDim2.new(0, 10, 0.5, -10)
+                        Icn.BackgroundTransparency = 1
+                        Icn.Image = ButtonConfig.Icon
+                        Btn.Text = "  " .. ButtonConfig.Name
+                    end
+
+                    Btn.MouseButton1Click:Connect(function()
+                        TweenService:Create(Btn, TweenInfo.new(0.1, Enum.EasingStyle.Quad), {Size = UDim2.new(1, 0, 0, 36)}):Play()
+                        task.wait(0.1)
+                        TweenService:Create(Btn, TweenInfo.new(0.1, Enum.EasingStyle.Back), {Size = UDim2.new(1, 0, 0, 40)}):Play()
+                        ButtonConfig.Callback()
+                        FelixzUI:Notify(ButtonConfig.Name, "Clicked!", 1.5, nil, "Primary")
+                    end)
+
+                    Btn.MouseEnter:Connect(function()
+                        TweenService:Create(Btn, TweenInfo.new(0.2), {BackgroundColor3 = getgenv().CurrentTheme.Hover}):Play()
+                    end)
+                    Btn.MouseLeave:Connect(function()
+                        TweenService:Create(Btn, TweenInfo.new(0.2), {BackgroundColor3 = getgenv().CurrentTheme.Highlight}):Play()
+                    end)
+
+                    return Btn
+                end
+
+                table.insert(Tab.Sections, Section)
+                return Section
+            end
+
+            return Tab
+        end
+
+        return Window
     end
 
-    -- 🔄 إضافة دوال التحديث الأساسية
-    updateTheme()
+    if Window.KeyVerified then
+        Window:Init()
+    end
 
-    return self
+    return Window
 end
 
 return FelixzUI
