@@ -1098,173 +1098,90 @@ function FelixzUI:CreateWindow(Config)
                     Frame.Size = UDim2.new(1, 0, 0, Layout.AbsoluteContentSize.Y + 50)
                 end)
 
-function Section:Toggle(ToggleConfig)
-    local theme = getTheme()
-    ToggleConfig = ToggleConfig or {}
-    ToggleConfig.Name = ToggleConfig.Name or "Toggle"
-    ToggleConfig.Default = ToggleConfig.Default or false
-    ToggleConfig.Callback = ToggleConfig.Callback or function() end
+                -- Toggle Element (No change in logic, only colors/theme access)
+                function Section:Toggle(ToggleConfig)
+                    ToggleConfig = ToggleConfig or {}
+                    ToggleConfig.Name = ToggleConfig.Name or "Toggle"
+                    ToggleConfig.Default = ToggleConfig.Default or false
+                    ToggleConfig.Callback = ToggleConfig.Callback or function() end
 
-    local Toggle = {}
-    local Value = ToggleConfig.Default
-    getgenv().AllToggles[ToggleConfig.Name] = Value
+                    local Toggle = {}
+                    local Value = ToggleConfig.Default
+                    getgenv().AllToggles[ToggleConfig.Name] = Value
 
-    -- 📏 الصف (Row)
-    local Row = Instance.new("Frame")
-    Row.Size = UDim2.new(1, 0, 0, 36) -- زيادة الحجم قليلاً للتوافق مع العناصر الجديدة
-    Row.BackgroundTransparency = 1
-    Row.Parent = Container
+                    local Row = Instance.new("Frame")
+                    Row.Size = UDim2.new(1, 0, 0, 35)
+                    Row.BackgroundTransparency = 1
+                    Row.Parent = Container
 
-    -- 📝 العنوان (Label)
-    local Label = Instance.new("TextLabel", Row)
-    Label.Text = ToggleConfig.Name
-    Label.Font = Enum.Font.Gotham
-    Label.TextSize = 14
-    Label.TextColor3 = theme.Text -- استخدام لون النص من الثيم
-    Label.BackgroundTransparency = 1
-    Label.Size = UDim2.new(1, -70, 1, 0)
-    Label.Position = UDim2.new(0, 10, 0, 0) -- إضافة مسافة داخلية (Padding)
-    Label.TextXAlignment = Enum.TextXAlignment.Left
+                    local Label = Instance.new("TextLabel", Row)
+                    Label.Text = ToggleConfig.Name
+                    Label.Font = Enum.Font.Gotham
+                    Label.TextSize = 14
+                    Label.TextColor3 = getgenv().CurrentTheme.Text
+                    Label.BackgroundTransparency = 1
+                    Label.Size = UDim2.new(1, -60, 1, 0)
+                    Label.TextXAlignment = Enum.TextXAlignment.Left
 
-    -- 🔘 إطار التوغّل (ToggleFrame)
-    local ToggleFrame = Instance.new("Frame", Row)
-    ToggleFrame.Size = UDim2.new(0, 48, 0, 24) -- زيادة الحجم
-    ToggleFrame.Position = UDim2.new(1, -10, 0.5, -12) -- موقع نهائي
-    ToggleFrame.BackgroundColor3 = Value and theme.Highlight or theme.Accent -- استخدام Highlight/Accent
-    ToggleFrame.BorderSizePixel = 0
-    ToggleFrame.ClipsDescendants = true -- لقص الـGlow عند الأطراف
-    ToggleFrame.ZIndex = 2
-    Instance.new("UICorner", ToggleFrame).CornerRadius = UDim.new(1, 0) -- جعلها مستديرة تمامًا
+                    local ToggleFrame = Instance.new("Frame", Row)
+                    ToggleFrame.Size = UDim2.new(0, 40, 0, 20)
+                    ToggleFrame.Position = UDim2.new(1, -50, 0.5, -10)
+                    ToggleFrame.BackgroundColor3 = Value and getgenv().CurrentTheme.Success or getgenv().CurrentTheme.Danger
+                    ToggleFrame.BorderSizePixel = 0
+                    local ToggleCorner = Instance.new("UICorner", ToggleFrame)
+                    ToggleCorner.CornerRadius = UDim.new(0, 10)
 
-    -- ✨ UIStroke (الحدود الخارجية)
-    local ToggleStroke = Instance.new("UIStroke", ToggleFrame)
-    ToggleStroke.Color = theme.Highlight
-    ToggleStroke.Thickness = 1
-    ToggleStroke.Transparency = Value and 0.1 or 0.5
-    ToggleStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+                    local Knob = Instance.new("Frame", ToggleFrame)
+                    Knob.Size = UDim2.new(0, 16, 0, 16)
+                    Knob.Position = Value and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 2, 0.5, -8)
+                    Knob.BackgroundColor3 = Color3.new(1,1,1)
+                    Knob.BorderSizePixel = 0
+                    local KnobCorner = Instance.new("UICorner", Knob)
+                    KnobCorner.CornerRadius = UDim.new(0, 8)
 
-    -- 💡 Neon Glow (طبقة التوهج)
-    local NeonGlow = Instance.new("ImageLabel", ToggleFrame)
-    NeonGlow.Name = "NeonGlow"
-    NeonGlow.Size = UDim2.new(1.5, 0, 1.5, 0)
-    NeonGlow.Position = UDim2.new(0.5, 0, 0.5, 0)
-    NeonGlow.AnchorPoint = Vector2.new(0.5, 0.5)
-    NeonGlow.BackgroundTransparency = 1
-    NeonGlow.Image = "rbxassetid://4996891970"
-    NeonGlow.ImageColor3 = theme.Glow or theme.Highlight
-    NeonGlow.ImageTransparency = Value and 0.6 or 1 -- التحكم بالشفافية حسب القيمة
-    NeonGlow.ZIndex = 1
+                    local ClickBtn = Instance.new("TextButton", ToggleFrame)
+                    ClickBtn.Size = UDim2.new(1, 0, 1, 0)
+                    ClickBtn.BackgroundTransparency = 1
+                    ClickBtn.Text = ""
 
-    -- ⚪ المقبض (Knob)
-    local Knob = Instance.new("Frame", ToggleFrame)
-    Knob.Size = UDim2.new(0, 20, 0, 20) -- زيادة الحجم
-    Knob.Position = Value and UDim2.new(1, -22, 0.5, -10) or UDim2.new(0, 2, 0.5, -10) -- تحديث المواقع بناءً على الحجم الجديد
-    Knob.BackgroundColor3 = theme.Background -- لون الخلفية
-    Knob.BorderSizePixel = 0
-    Instance.new("UICorner", Knob).CornerRadius = UDim.new(1, 0)
+                    local function toggle(newValue, isInternal)
+                        Value = newValue
+                        getgenv().AllToggles[ToggleConfig.Name] = Value
+                        TweenService:Create(ToggleFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {
+                            BackgroundColor3 = Value and getgenv().CurrentTheme.Success or getgenv().CurrentTheme.Danger
+                        }):Play()
+                        TweenService:Create(Knob, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {
+                            Position = Value and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 2, 0.5, -8)
+                        }):Play()
+                        if not isInternal then
+                            ToggleConfig.Callback(Value)
+                            FelixzUI:Notify(ToggleConfig.Name, Value and "Enabled" or "Disabled", 1, nil, Value and "Success" or "Danger")
+                        end
+                    end
 
-    -- 🔍 UIStroke للـKnob
-    local KnobStroke = Instance.new("UIStroke", Knob)
-    KnobStroke.Color = theme.Highlight
-    KnobStroke.Thickness = 1
-    KnobStroke.Transparency = 0.3
-    KnobStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+                    ClickBtn.MouseButton1Click:Connect(function()
+                        toggle(not Value, false)
+                    end)
 
-    -- 🖱️ زر النقر المخفي (ClickBtn)
-    local ClickBtn = Instance.new("TextButton", Row) -- وضعه على الـRow لتسهيل النقر على كل الصف
-    ClickBtn.Size = UDim2.new(1, 0, 1, 0)
-    ClickBtn.BackgroundTransparency = 1
-    ClickBtn.Text = ""
-    ClickBtn.ZIndex = 3
+                    ClickBtn.MouseEnter:Connect(function()
+                        TweenService:Create(ToggleFrame, TweenInfo.new(0.1), {Size = UDim2.new(0, 42, 0, 22)}):Play()
+                    end)
+                    ClickBtn.MouseLeave:Connect(function()
+                        TweenService:Create(ToggleFrame, TweenInfo.new(0.1), {Size = UDim2.new(0, 40, 0, 20)}):Play()
+                    end)
 
-    -- ⚙️ دالة التبديل الرئيسية
-    local function toggle(newValue, isInternal)
-        Value = newValue
-        getgenv().AllToggles[ToggleConfig.Name] = Value
-        local th = getTheme()
+                    function Toggle:Set(newValue, isInternal)
+                        toggle(newValue, isInternal)
+                    end
 
-        -- 🎯 الحركة (Knob)
-        local targetKnobPos = Value and UDim2.new(1, -22, 0.5, -10) or UDim2.new(0, 2, 0.5, -10)
-        TweenService:Create(Knob, TweenInfo.new(0.18, Enum.EasingStyle.Quart), {Position = targetKnobPos}):Play()
+                    function Toggle:Get()
+                        return Value
+                    end
 
-        -- 🎨 الألوان والتوهج
-        local targetColor = Value and th.Highlight or th.Accent
-        local targetGlowTrans = Value and 0.6 or 1
-        local targetStrokeTrans = Value and 0.1 or 0.5
+                    getgenv().ToggleSetters[ToggleConfig.Name] = toggle
 
-        TweenService:Create(ToggleFrame, TweenInfo.new(0.18), { BackgroundColor3 = targetColor }):Play()
-        TweenService:Create(NeonGlow, TweenInfo.new(0.18), { ImageTransparency = targetGlowTrans }):Play()
-        TweenService:Create(ToggleStroke, TweenInfo.new(0.18), { Transparency = targetStrokeTrans }):Play()
-
-        if not isInternal then
-            -- 📞 تشغيل الـCallback والإشعارات
-            ToggleConfig.Callback(Value)
-            FelixzUI:Notify(
-                ToggleConfig.Name,
-                Value and "Enabled" or "Disabled",
-                1,
-                nil,
-                Value and "Primary" or "Accent" -- استخدام Primary/Accent لتجنب Success/Danger إذا أردت
-            )
-        end
-    end
-
-    -- 🎨 دالة تحديث الثيم
-    local function updateToggleTheme()
-        local th = getTheme()
-        Label.TextColor3 = th.Text
-        Knob.BackgroundColor3 = th.Background
-        KnobStroke.Color = th.Highlight
-        ToggleStroke.Color = th.Highlight
-        NeonGlow.ImageColor3 = th.Glow or th.Highlight
-        
-        -- تحديث الحالة الحالية
-        local targetColor = Value and th.Highlight or th.Accent
-        ToggleFrame.BackgroundColor3 = targetColor
-        NeonGlow.ImageTransparency = Value and 0.6 or 1
-        ToggleStroke.Transparency = Value and 0.1 or 0.5
-    end
-    
-    -- 📝 تسجيل تحديث الثيم
-    getgenv().ThemeUpdatables = getgenv().ThemeUpdatables or {}
-    table.insert(getgenv().ThemeUpdatables, updateToggleTheme)
-
-    -- 🖱️ التفاعل
-    ClickBtn.MouseButton1Click:Connect(function()
-        toggle(not Value, false)
-    end)
-    
-    -- 🖱️ Hover (على الـRow بالكامل لسهولة الاستخدام)
-    ClickBtn.MouseEnter:Connect(function()
-        local th = getTheme()
-        TweenService:Create(ToggleFrame, TweenInfo.new(0.1), {
-            BackgroundColor3 = Value and th.Highlight or th.Hover
-        }):Play()
-    end)
-    ClickBtn.MouseLeave:Connect(function()
-        local th = getTheme()
-        TweenService:Create(ToggleFrame, TweenInfo.new(0.1), {
-            BackgroundColor3 = Value and th.Highlight or th.Accent
-        }):Play()
-    end)
-
-
-    -- 🧠 الوظائف الخارجية (API)
-    function Toggle:Set(newValue, isInternal)
-        toggle(newValue, isInternal)
-    end
-
-    function Toggle:Get()
-        return Value
-    end
-
-    getgenv().ToggleSetters[ToggleConfig.Name] = toggle
-    
-    -- تطبيق الحالة الافتراضية فوراً
-    toggle(Value, true)
-
-    return Toggle
-end
+                    return Toggle
+                end
 
                 -- Slider Element
                 function Section:Slider(SliderConfig)
