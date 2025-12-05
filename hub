@@ -1,0 +1,317 @@
+-- ══════════════════════════════════════════════
+--    Felixz UI Library v2.0 - WindUI Killer
+--    Made with love for you bro
+--    Usage: loadstring(game:HttpGet("https://raw.githubusercontent.com/felixzhub/FelixzUI/main/Library.lua"))()
+-- ══════════════════════════════════════════════
+
+local FelixzUI = {}
+FelixzUI.Version = "2.0"
+FelixzUI.Author = "Felixz"
+
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local HttpService = game:GetService("HttpService")
+local CoreGui = game:GetService("CoreGui")
+local player = Players.LocalPlayer
+
+-- Themes
+FelixzUI.Themes = {
+    Dark = {
+        Background = Color3.fromRGB(14, 14, 20),
+        Accent = Color3.fromRGB(22, 22, 32),
+        Text = Color3.fromRGB(240, 240, 255),
+        Primary = Color3.fromRGB(130, 90, 255),
+        Secondary = Color3.fromRGB(90, 200, 255),
+        Success = Color3.fromRGB(80, 220, 140),
+        Danger = Color3.fromRGB(255, 80, 100),
+        Shadow = Color3.fromRGB(0, 0, 0)
+    },
+    -- يمكنك إضافة ثيمات أخرى
+}
+
+FelixzUI.CurrentTheme = FelixzUI.Themes.Dark
+
+-- Main Functions
+function FelixzUI:CreateWindow(Config)
+    Config = Config or {}
+    Config.Name = Config.Name or "Felixz Hub"
+    Config.KeySystem = Config.KeySystem or false
+    Config.Key = Config.Key or "FELIXZ-BETA-2025"
+
+    local Window = {}
+    Window.Tabs = {}
+    Window.KeyVerified = not Config.KeySystem
+
+    -- Key System (Optional)
+    if Config.KeySystem and not isfile("felixz_key.txt") then
+        local KeyGui = Instance.new("ScreenGui")
+        KeyGui.Name = "FelixzKeySystem"
+        KeyGui.Parent = CoreGui
+
+        local Frame = Instance.new("Frame", KeyGui)
+        Frame.Size = UDim2.new(0, 420, 0, 240)
+        Frame.Position = UDim2.new(0.5, -210, 0.5, -120)
+        Frame.BackgroundColor3 = Color3.fromRGB(18, 18, 28)
+        Frame.BorderSizePixel = 0
+        Instance.new("UICorner", Frame).CornerRadius = UDim.new(0, 16)
+
+        local Glow = Instance.new("ImageLabel", Frame)
+        Glow.Size = UDim2.new(1, 60, 1, 60)
+        Glow.Position = UDim2.new(0.5, -30, 0.5, -30)
+        Glow.AnchorPoint = Vector2.new(0.5, 0.5)
+        Glow.BackgroundTransparency = 1
+        Glow.Image = "rbxassetid://4996891970"
+        Glow.ImageColor3 = FelixzUI.CurrentTheme.Primary
+        Glow.ImageTransparency = 0.6
+        Glow.ZIndex = 0
+
+        local Title = Instance.new("TextLabel", Frame)
+        Title.Text = "Felixz Hub – Key System"
+        Title.Font = Enum.Font.GothamBold
+        Title.TextSize = 24
+        Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+        Title.BackgroundTransparency = 1
+        Title.Size = UDim2.new(1, 0, 0, 50)
+        Title.Position = UDim2.new(0, 0, 0, 20)
+
+        local Input = Instance.new("TextBox", Frame)
+        Input.PlaceholderText = "Enter your key..."
+        Input.Size = UDim2.new(0, 360, 0, 50)
+        Input.Position = UDim2.new(0.5, -180, 0.5, -25)
+        Input.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
+        Input.TextColor3 = Color3.fromRGB(255, 255, 255)
+        Input.Font = Enum.Font.Gotham
+        Input.TextSize = 18
+        Instance.new("UICorner", Input).CornerRadius = UDim.new(0, 12)
+
+        local Submit = Instance.new("TextButton", Frame)
+        Submit.Text = "Verify"
+        Submit.Size = UDim2.new(0, 360, 0, 50)
+        Submit.Position = UDim2.new(0.5, -180, 1, -80)
+        Submit.BackgroundColor3 = FelixzUI.CurrentTheme.Primary
+        Submit.TextColor3 = Color3.fromRGB(255, 255, 255)
+        Submit.Font = Enum.Font.GothamBold
+        Submit.TextSize = 18
+        Instance.new("UICorner", Submit).CornerRadius = UDim.new(0, 12)
+
+        Submit.MouseButton1Click:Connect(function()
+            if Input.Text == Config.Key then
+                writefile("felixz_key.txt", "verified")
+                KeyGui:Destroy()
+                Window.KeyVerified = true
+                FelixzUI:Notify("Success", "Key accepted! Welcome!", 4)
+                Window:Init()
+            else
+                FelixzUI:Notify("Error", "Invalid key!", 4)
+            end
+        end)
+
+        return Window
+    end
+
+    if isfile("felixz_key.txt") then
+        Window.KeyVerified = true
+    end
+
+    -- Create Main Window
+    function Window:Init()
+        local ScreenGui = Instance.new("ScreenGui")
+        ScreenGui.Name = "FelixzUI"
+        ScreenGui.ResetOnSpawn = false
+        ScreenGui.Parent = CoreGui
+
+        local Main = Instance.new("Frame")
+        Main.Name = "Main"
+        Main.Size = UDim2.new(0, 680, 0, 480)
+        Main.Position = UDim2.new(0.5, -340, 0.5, -240)
+        Main.BackgroundColor3 = FelixzUI.CurrentTheme.Background
+        Main.BackgroundTransparency = 0.05
+        Main.BorderSizePixel = 0
+        Main.ClipsDescendants = true
+        Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 16)
+        Main.Parent = ScreenGui
+
+        local Glow = Instance.new("ImageLabel", Main)
+        Glow.Size = UDim2.new(1, 80, 1, 80)
+        Glow.Position = UDim2.new(0.5, -40, 0.5, -40)
+        Glow.AnchorPoint = Vector2.new(0.5, 0.5)
+        Glow.BackgroundTransparency = 1
+        Glow.Image = "rbxassetid://4996891970"
+        Glow.ImageColor3 = FelixzUI.CurrentTheme.Primary
+        Glow.ImageTransparency = 0.5
+        Glow.ZIndex = 0
+
+        local Stroke = Instance.new("UIStroke", Main)
+        Stroke.Thickness = 2
+        Stroke.Color = FelixzUI.CurrentTheme.Primary
+        Stroke.Transparency = 0.3
+
+        local TitleBar = Instance.new("Frame", Main)
+        TitleBar.Size = UDim2.new(1, 0, 0, 50)
+        TitleBar.BackgroundColor3 = FelixzUI.CurrentTheme.Accent
+        TitleBar.BorderSizePixel = 0
+        Instance.new("UICorner", TitleBar).CornerRadius = UDim.new(0, 16)
+
+        local Title = Instance.new("TextLabel", TitleBar)
+        Title.Text = Config.Name
+        Title.Font = Enum.Font.GothamBold
+        Title.TextSize = 18
+        Title.TextColor3 = FelixzUI.CurrentTheme.Text
+        Title.BackgroundTransparency = 1
+        Title.Size = UDim2.new(1, -100, 1, 0)
+        Title.Position = UDim2.new(0, 20, 0, 0)
+
+        -- Draggable
+        local dragging, dragInput, dragStart, startPos
+        TitleBar.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                dragging = true
+                dragStart = input.Position
+                startPos = Main.Position
+                input.Changed:Connect(function()
+                    if input.UserInputState == Enum.UserInputState.End then dragging = false end
+                end)
+            end
+        end)
+        TitleBar.InputChanged:Connect(function(input)
+            if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+                local delta = input.Position - dragStart
+                TweenService:Create(Main, TweenInfo.new(0.1), {Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)}):Play()
+            end
+        end)
+
+        -- Tabs Container
+        local TabButtons = Instance.new("Frame", Main)
+        TabButtons.Size = UDim2.new(0, 150, 1, -50)
+        TabButtons.Position = UDim2.new(0, 0, 0, 50)
+        TabButtons.BackgroundTransparency = 1
+
+        local TabContent = Instance.new("Frame", Main)
+        TabContent.Size = UDim2.new(1, -150, 1, -50)
+        TabContent.Position = UDim2.new(0, 150, 0, 50)
+        TabContent.BackgroundTransparency = 1
+
+        -- Create Tab Function
+        function Window:CreateTab(TabConfig)
+            TabConfig = TabConfig or {}
+            TabConfig.Name = TabConfig.Name or "Tab"
+            TabConfig.Icon = TabConfig.Icon or "rbxassetid://8498174594"
+
+            local Tab = {}
+            Tab.Sections = {}
+
+            local Button = Instance.new("TextButton", TabButtons)
+            Button.Size = UDim2.new(1, -20, 0, 45)
+            Button.Position = UDim2.new(0, 10, 0, #Window.Tabs * 55 + 10)
+            Button.BackgroundColor3 = FelixzUI.CurrentTheme.Accent
+            Button.Text = ""
+            Button.AutoButtonColor = false
+            Instance.new("UICorner", Button).CornerRadius = UDim.new(0, 10)
+
+            local Icon = Instance.new("ImageLabel", Button)
+            Icon.Size = UDim2.new(0, 28, 0, 28)
+            Icon.Position = UDim2.new(0, 12, 0.5, -14)
+            Icon.BackgroundTransparency = 1
+            Icon.Image = TabConfig.Icon
+
+            local Name = Instance.new("TextLabel", Button)
+            Name.Text = TabConfig.Name
+            Name.Font = Enum.Font.GothamBold
+            Name.TextSize = 15
+            Name.TextColor3 = FelixzUI.CurrentTheme.Text
+            Name.BackgroundTransparency = 1
+            Name.Size = UDim2.new(1, -60, 1, 0)
+            Name.Position = UDim2.new(0, 50, 0, 0)
+            Name.TextXAlignment = Enum.TextXAlignment.Left
+
+            local Content = Instance.new("ScrollingFrame", TabContent)
+            Content.Size = UDim2.new(1, -20, 1, -20)
+            Content.Position = UDim2.new(0, 10, 0, 10)
+            Content.BackgroundTransparency = 1
+            Content.ScrollBarThickness = 4
+            Content.Visible = false
+            Content.CanvasSize = UDim2.new(0, 0, 0, 0)
+            Instance.new("UIListLayout", Content).Padding = UDim.new(0, 10)
+
+            Button.MouseButton1Click:Connect(function()
+                for _, tab in pairs(Window.Tabs) do
+                    tab.Content.Visible = false
+                    tab.Button.BackgroundColor3 = FelixzUI.CurrentTheme.Accent
+                end
+                Content.Visible = true
+                Button.BackgroundColor3 = FelixzUI.CurrentTheme.Primary
+            end)
+
+            if #Window.Tabs == 0 then
+                Content.Visible = true
+                Button.BackgroundColor3 = FelixzUI.CurrentTheme.Primary
+            end
+
+            table.insert(Window.Tabs, {Button = Button, Content = Content})
+
+            -- Section Function
+            function Tab:CreateSection(Name)
+                local Section = {}
+                local Frame = Instance.new("Frame", Content)
+                Frame.Size = UDim2.new(1, 0, 0, 0)
+                Frame.BackgroundColor3 = FelixzUI.CurrentTheme.Accent
+                Frame.BackgroundTransparency = 0.5
+                Instance.new("UICorner", Frame).CornerRadius = UDim.new(0, 12)
+                Instance.new("UIStroke", Frame).Color = FelixzUI.CurrentTheme.Primary
+                Instance.new("UIStroke", Frame).Transparency = 0.8
+
+                local Title = Instance.new("TextLabel", Frame)
+                Title.Text = Name
+                Title.Font = Enum.Font.GothamBold
+                Title.TextSize = 16
+                Title.TextColor3 = FelixzUI.CurrentTheme.Text
+                Title.BackgroundTransparency = 1
+                Title.Size = UDim2.new(1, 0, 0, 35)
+                Title.Position = UDim2.new(0, 15, 0, 0)
+
+                local Container = Instance.new("Frame", Frame)
+                Container.Size = UDim2.new(1, -20, 1, -45)
+                Container.Position = UDim2.new(0, 10, 0, 40)
+                Container.BackgroundTransparency = 1
+                local Layout = Instance.new("UIListLayout", Container)
+                Layout.Padding = UDim.new(0, 8)
+                Layout.FillDirection = Enum.FillDirection.Vertical
+
+                Frame.Size = UDim2.new(1, 0, 0, Layout.AbsoluteContentSize.Y + 50)
+                Layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+                    Frame.Size = UDim2.new(1, 0, 0, Layout.AbsoluteContentSize.Y + 50)
+                    Content.CanvasSize = UDim2.new(0, 0, 0, Layout.AbsoluteContentSize.Y + 100)
+                end)
+
+                -- Toggle
+                function Section:Toggle(Config)
+                    -- كود التوغل الجميل (نفس ستايل WindUI)
+                end
+
+                -- Slider, Button, Dropdown, Keybind, etc...
+                -- سأرسل لك الباقي في الجزء الثاني
+
+                return Section
+            end
+
+            return Tab
+        end
+
+        return Window
+    end
+
+    if Window.KeyVerified then
+        Window:Init()
+    end
+
+    return Window
+end
+
+-- Notification Function
+function FelixzUI:Notify(Title, Text, Duration)
+    -- كود الإشعارات الجميلة (سيأتي مع النسخة الكاملة)
+end
+
+return FelixzUI
